@@ -1,6 +1,7 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
   Bell,
+  CalendarDays,
   Camera,
   FileText,
   IndianRupee,
@@ -9,6 +10,7 @@ import {
   Users,
 } from 'lucide-react'
 import { BrandMark } from '../components/BrandMark.tsx'
+import { Onboarding } from '../components/Onboarding.tsx'
 import { logoutStudio, useStudio } from '../lib/store.ts'
 import { asset } from '../lib/paths.ts'
 import { clsx } from '../lib/clsx.ts'
@@ -16,6 +18,7 @@ import { clsx } from '../lib/clsx.ts'
 const links = [
   { to: '/studio', label: 'Desk', icon: LayoutDashboard, end: true },
   { to: '/studio/leads', label: 'Leads', icon: Users },
+  { to: '/studio/bookings', label: 'Bookings', icon: CalendarDays },
   { to: '/studio/follow-ups', label: 'Follow-ups', icon: Bell },
   { to: '/studio/quotations', label: 'Quotations', icon: FileText },
   { to: '/studio/payments', label: 'Payments', icon: IndianRupee },
@@ -26,7 +29,8 @@ export function StudioShell() {
   const navigate = useNavigate()
 
   return (
-    <div className="min-h-screen bg-ink text-cream lg:grid lg:grid-cols-[260px_1fr]">
+    <div className="min-h-screen bg-ink text-cream lg:grid lg:grid-cols-[240px_1fr]">
+      <Onboarding />
       <aside className="relative hidden overflow-hidden border-r border-line lg:flex lg:flex-col">
         <img
           src={asset('photos/photographer.png')}
@@ -79,12 +83,14 @@ export function StudioShell() {
         </div>
       </aside>
 
-      <div className="min-h-screen">
+      <div className="min-h-screen pb-2">
         <header className="sticky top-0 z-20 flex items-center justify-between border-b border-line bg-ink/80 px-4 py-3 backdrop-blur lg:hidden">
           <BrandMark />
-          <span className="text-xs uppercase tracking-[0.18em] text-gold-soft">{studio.name}</span>
+          <span className="max-w-[40%] truncate text-xs uppercase tracking-[0.18em] text-gold-soft">
+            {studio.name}
+          </span>
         </header>
-        <nav className="flex gap-1 overflow-x-auto border-b border-line px-3 py-2 lg:hidden">
+        <nav className="sticky top-[57px] z-20 flex gap-1 overflow-x-auto border-b border-line bg-ink/90 px-3 py-2 lg:hidden">
           {links.map((link) => (
             <NavLink
               key={link.to}

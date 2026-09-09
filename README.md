@@ -2,33 +2,28 @@
 
 **The studio desk for wedding photographers.**
 
-GoldHour is software for the people who make money from weddings — photographers, cinematographers, décor, makeup, planners — not another app for brides.
+Run one wedding: enquiry → quotation → follow-up → booked → payments → day-of timeline.
 
-India’s wedding market is enormous. Most small studios still run the business on WhatsApp, Excel, phone calls and notebooks. GoldHour is the desk that sits beside the camera.
+Live: [kuttenajith.github.io/goldhour](https://kuttenajith.github.io/goldhour)
 
-Live demo: [kuttenajith.github.io/goldhour](https://kuttenajith.github.io/goldhour)
+PIN: `2026` · Demo: **Meenakshi Frames, Madurai**
 
-Studio PIN: `2026` · Demo studio: **Meenakshi Frames, Madurai**
+If the desk looks like an older version, open Payments → **Reset demo data**.
 
-## What it does (v1)
+## What a photographer can do today
 
-1. **Leads** — name, phone, event date, budget, service, source, status
-2. **Quotations** — professional gold-on-black PDF letterhead
-3. **Follow-ups** — today, tomorrow, after 7 days
-4. **Payments** — total, advance, balance
-5. **WhatsApp** — send quotation, payment reminder, event reminder
+1. **New enquiry** — name, phone, date, venue, events, budget, source
+2. **Quote → booked** — PDF, WhatsApp, Accepted, then Booked
+3. **Follow-up** — 2 days, then 5 if there is no response
+4. **Payments** — advance, before wedding, final delivery, outstanding
+5. **Wedding-day timeline** — 06:00 getting ready through portraits
+6. **WhatsApp** — qualify, quote, follow up, remind for money, remind for the day
 
-No backend. Your demo data lives in the browser. Reset it from Payments.
+No backend. Data stays in the browser. That is enough to sit with five studios.
 
-## Who pays
+## Next step (founder)
 
-The vendor.
-
-| Plan | Price |
-| --- | --- |
-| Starter | ₹499 / month |
-| Professional | ₹999 / month |
-| Business | ₹1,999 / month |
+Read [PLAYBOOK.md](./PLAYBOOK.md). Contact 20 photographers. Get 5 using a real booking. Do not add Razorpay yet.
 
 ## Run locally
 
@@ -36,12 +31,6 @@ The vendor.
 bun install
 bun dev
 ```
-
-Open [http://localhost:5173](http://localhost:5173).
-
-## Deploy
-
-Push to `main`. GitHub Actions publishes GitHub Pages at `/goldhour/`.
 
 ## License
 

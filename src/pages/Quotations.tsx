@@ -12,7 +12,7 @@ export function Quotations() {
     <div className="space-y-6">
       <div>
         <p className="text-xs uppercase tracking-[0.28em] text-gold-soft">Letterhead</p>
-        <h1 className="mt-2 font-display text-5xl">Quotations</h1>
+        <h1 className="mt-2 font-display text-4xl sm:text-5xl">Quotations</h1>
       </div>
       <div className="grid gap-4">
         {quotations.map((q) => {

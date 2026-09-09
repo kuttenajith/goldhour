@@ -5,39 +5,49 @@ import { Button } from '../components/Button.tsx'
 import { StatusPill } from '../components/StatusPill.tsx'
 import type { Lead } from '../lib/types.ts'
 
-function bucket(leads: Lead[]) {
-  const today = todayIso()
-  const tomorrow = addDays(today, 1)
-  const week = addDays(today, 7)
-  return {
-    today: leads.filter((l) => l.nextActionOn <= today),
-    tomorrow: leads.filter((l) => l.nextActionOn === tomorrow),
-    week: leads.filter((l) => l.nextActionOn > tomorrow && l.nextActionOn <= week),
-  }
-}
-
 export function FollowUps() {
   const { leads } = useStudio()
-  const active = leads.filter((l) => l.status !== 'completed' && l.status !== 'lost')
-  const groups = bucket(active)
+  const active = leads.filter((l) => l.status !== 'completed' && l.status !== 'lost' && l.status !== 'booked')
+  const today = todayIso()
+
+  const due = active.filter((l) => l.nextActionOn <= today)
+  const inTwo = active.filter(
+    (l) => (l.status === 'quoted' || l.status === 'follow_up') && l.nextActionOn > today,
+  )
+  const silent = active.filter((l) => l.status === 'no_response' && l.nextActionOn > today)
 
   return (
     <div className="space-y-8">
       <div>
         <p className="text-xs uppercase tracking-[0.28em] text-gold-soft">Rhythm</p>
-        <h1 className="mt-2 font-display text-5xl">Follow-ups</h1>
+        <h1 className="mt-2 font-display text-4xl sm:text-5xl">Follow-ups</h1>
+        <p className="mt-2 max-w-xl text-sm text-mute">
+          Quotation sent → follow up in 2 days → no response → follow up in 5 days.
+        </p>
       </div>
-      <Group title="Follow up today" items={groups.today} />
-      <Group title="Follow up tomorrow" items={groups.tomorrow} />
-      <Group title="Follow up after 7 days" items={groups.week} />
+      <Group title="Due now" items={due} snoozeLabel="Snooze 2d" snoozeDays={2} />
+      <Group title="Quotation sent · follow up in 2 days" items={inTwo} snoozeLabel="No response · 5d" snoozeDays={5} silent />
+      <Group title="No response · follow up in 5 days" items={silent} snoozeLabel="Snooze 5d" snoozeDays={5} />
     </div>
   )
 }
 
-function Group({ title, items }: { title: string; items: Lead[] }) {
+function Group({
+  title,
+  items,
+  snoozeLabel,
+  snoozeDays,
+  silent,
+}: {
+  title: string
+  items: Lead[]
+  snoozeLabel: string
+  snoozeDays: number
+  silent?: boolean
+}) {
   return (
-    <section className="rounded-3xl border border-line bg-ink-2 p-6">
-      <h2 className="font-display text-3xl">{title}</h2>
+    <section className="rounded-3xl border border-line bg-ink-2 p-5 sm:p-6">
+      <h2 className="font-display text-2xl sm:text-3xl">{title}</h2>
       {items.length === 0 ? (
         <p className="mt-4 text-sm text-mute">Clear. Nothing in this tray.</p>
       ) : (
@@ -57,9 +67,16 @@ function Group({ title, items }: { title: string; items: Lead[] }) {
                 <Button
                   tone="ghost"
                   className="px-3 py-1.5 text-xs"
-                  onClick={() => setNextAction(l.id, 'Follow up after 7 days', addDays(todayIso(), 7))}
+                  onClick={() =>
+                    setNextAction(
+                      l.id,
+                      silent ? 'No response — follow up in 5 days' : `Follow up in ${snoozeDays} days`,
+                      addDays(todayIso(), snoozeDays),
+                      silent ? 'no_response' : 'follow_up',
+                    )
+                  }
                 >
-                  Snooze 7d
+                  {snoozeLabel}
                 </Button>
               </div>
             </li>

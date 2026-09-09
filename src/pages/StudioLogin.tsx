@@ -40,8 +40,9 @@ export function StudioLogin() {
         <BrandMark />
         <h1 className="mt-10 font-display text-5xl">Studio sign in</h1>
         <p className="mt-3 max-w-md text-mute">
-          Demo studio: <span className="text-gold-soft">Meenakshi Frames, Madurai</span>. PIN{' '}
-          <span className="text-gold-soft">2026</span>.
+          No account. Demo studio <span className="text-gold-soft">Meenakshi Frames, Madurai</span>.
+          PIN <span className="text-gold-soft">2026</span>. Open Priya’s booked wedding and walk the
+          whole day.
         </p>
         <form onSubmit={submit} className="mt-10 max-w-sm space-y-5">
           <Field label="Season PIN">

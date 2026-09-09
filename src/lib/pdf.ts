@@ -49,10 +49,12 @@ export function downloadQuotation(studio: StudioProfile, lead: Lead, quote: Quot
   const rows: [string, string][] = [
     ['Prepared for', lead.coupleName],
     ['Event date', day(lead.eventDate)],
-    ['City', lead.city],
+    ['Venue', lead.venue || lead.city],
     ['Package', quote.packageName],
     ['Investment', money(quote.amount)],
-    ['Advance to confirm', money(Math.round(quote.amount * 0.25))],
+    ['Advance to confirm', money(lead.plan?.advance ?? Math.round(quote.amount * 0.25))],
+    ['Before wedding', money(lead.plan?.beforeWedding ?? Math.round(quote.amount * 0.375))],
+    ['On delivery', money(lead.plan?.finalDelivery ?? Math.round(quote.amount * 0.375))],
   ]
 
   let y = 98

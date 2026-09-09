@@ -9,6 +9,7 @@ import { LeadDetail } from './pages/LeadDetail.tsx'
 import { FollowUps } from './pages/FollowUps.tsx'
 import { Quotations } from './pages/Quotations.tsx'
 import { Payments } from './pages/Payments.tsx'
+import { Bookings } from './pages/Bookings.tsx'
 
 function basename() {
   const raw = import.meta.env.BASE_URL
@@ -27,6 +28,7 @@ export function App() {
             <Route index element={<Dashboard />} />
             <Route path="leads" element={<Leads />} />
             <Route path="leads/:id" element={<LeadDetail />} />
+            <Route path="bookings" element={<Bookings />} />
             <Route path="follow-ups" element={<FollowUps />} />
             <Route path="quotations" element={<Quotations />} />
             <Route path="payments" element={<Payments />} />

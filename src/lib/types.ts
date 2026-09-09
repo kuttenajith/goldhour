@@ -2,7 +2,8 @@ export type LeadStatus =
   | 'new'
   | 'quoted'
   | 'follow_up'
-  | 'advance_pending'
+  | 'no_response'
+  | 'accepted'
   | 'booked'
   | 'completed'
   | 'lost'
@@ -17,17 +18,32 @@ export type LeadSource =
 
 export type ServiceType = 'photography' | 'cinematography' | 'both'
 
+export type PaymentKind = 'advance' | 'before_wedding' | 'final_delivery' | 'extra'
+
+export interface TimelineSlot {
+  id: string
+  time: string
+  title: string
+}
+
 export interface WeddingEvent {
   id: string
   name: string
   date: string
   done: boolean
+  timeline: TimelineSlot[]
+}
+
+export interface PaymentPlan {
+  advance: number
+  beforeWedding: number
+  finalDelivery: number
 }
 
 export interface Payment {
   id: string
   amount: number
-  kind: 'advance' | 'balance' | 'extra'
+  kind: PaymentKind
   receivedOn: string
   note: string
 }
@@ -46,11 +62,13 @@ export interface Lead {
   coupleName: string
   phone: string
   eventDate: string
+  venue: string
   budget: number
   service: ServiceType
   source: LeadSource
   status: LeadStatus
   packageAmount: number
+  plan: PaymentPlan
   city: string
   notes: string
   events: WeddingEvent[]

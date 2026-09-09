@@ -1,34 +1,55 @@
+import { defaultEvents, defaultWeddingTimeline, splitPlan } from './booking.ts'
 import { id } from './ids.ts'
+import { addDays, todayIso } from './format.ts'
 import type { Lead, Quotation, StudioState } from './types.ts'
 
-function lead(partial: Omit<Lead, 'id' | 'createdOn'> & { createdOn?: string }): Lead {
+function lead(
+  partial: Omit<Lead, 'id' | 'createdOn' | 'plan' | 'venue'> & {
+    createdOn?: string
+    venue?: string
+    plan?: Lead['plan']
+  },
+): Lead {
+  const packageAmount = partial.packageAmount || partial.budget || 0
   return {
     id: id(),
     createdOn: partial.createdOn ?? '2026-08-12',
     ...partial,
+    venue: partial.venue ?? '',
+    plan: partial.plan ?? splitPlan(packageAmount),
   }
 }
 
 export const DEMO_PIN = '2026'
 
 export function seedState(): StudioState {
+  const today = todayIso()
+
   const priya = lead({
     coupleName: 'Priya & Arjun',
     phone: '9876501234',
     eventDate: '2026-12-20',
+    venue: 'Heritage palace, Tamukkam, Madurai',
     budget: 150000,
     service: 'both',
     source: 'instagram',
-    status: 'follow_up',
+    status: 'booked',
     packageAmount: 120000,
     city: 'Madurai',
-    notes: 'Traditional Hindu wedding at a heritage venue. Wants candid + editorial portraits.',
-    nextAction: 'Follow up today',
-    nextActionOn: new Date().toISOString().slice(0, 10),
+    notes: 'Run this wedding end-to-end. Advance is in. Plan the day, collect the rest, shoot.',
+    nextAction: 'Lock the 20 Dec timeline with the family',
+    nextActionOn: today,
     events: [
-      { id: id(), name: 'Engagement', date: '2026-11-08', done: true },
-      { id: id(), name: 'Wedding', date: '2026-12-20', done: false },
-      { id: id(), name: 'Reception', date: '2026-12-21', done: false },
+      { id: id(), name: 'Engagement', date: '2026-11-08', done: true, timeline: [] },
+      { id: id(), name: 'Mehendi', date: '2026-12-19', done: false, timeline: [] },
+      {
+        id: id(),
+        name: 'Wedding',
+        date: '2026-12-20',
+        done: false,
+        timeline: defaultWeddingTimeline(),
+      },
+      { id: id(), name: 'Reception', date: '2026-12-21', done: false, timeline: [] },
     ],
     payments: [
       {
@@ -45,19 +66,17 @@ export function seedState(): StudioState {
     coupleName: 'Rahul & Meera',
     phone: '9843011122',
     eventDate: '2026-11-14',
+    venue: 'Meenakshi temple side, Madurai',
     budget: 90000,
     service: 'photography',
     source: 'whatsapp',
     status: 'quoted',
     packageAmount: 85000,
     city: 'Coimbatore',
-    notes: 'Intimate temple wedding. Asked for a quotation last week.',
-    nextAction: 'Quotation sent',
-    nextActionOn: new Date(Date.now() + 86400000).toISOString().slice(0, 10),
-    events: [
-      { id: id(), name: 'Wedding', date: '2026-11-14', done: false },
-      { id: id(), name: 'Reception', date: '2026-11-15', done: false },
-    ],
+    notes: 'Quotation sent. If they go quiet, follow up in 2 days, then 5.',
+    nextAction: 'Follow up in 2 days',
+    nextActionOn: addDays(today, 2),
+    events: defaultEvents('2026-11-14', ['Wedding', 'Reception']),
     payments: [],
   })
 
@@ -65,20 +84,17 @@ export function seedState(): StudioState {
     coupleName: 'Divya & Karthik',
     phone: '9003214455',
     eventDate: '2027-01-24',
+    venue: 'ITC Grand Chola lawns, Chennai',
     budget: 250000,
     service: 'both',
     source: 'planner',
-    status: 'advance_pending',
+    status: 'no_response',
     packageAmount: 210000,
     city: 'Chennai',
-    notes: 'Planner-led destination feel in the city. Two cinematographers requested.',
-    nextAction: 'Advance pending',
-    nextActionOn: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
-    events: [
-      { id: id(), name: 'Mehendi', date: '2027-01-22', done: false },
-      { id: id(), name: 'Wedding', date: '2027-01-24', done: false },
-      { id: id(), name: 'Reception', date: '2027-01-25', done: false },
-    ],
+    notes: 'No reply after the quote. Follow up in 5 days before you lose the date.',
+    nextAction: 'Follow up in 5 days — no response',
+    nextActionOn: addDays(today, 5),
+    events: defaultEvents('2027-01-24', ['Mehendi', 'Wedding', 'Reception']),
     payments: [],
   })
 
@@ -86,44 +102,35 @@ export function seedState(): StudioState {
     coupleName: 'Ananya & Vishal',
     phone: '9444412288',
     eventDate: '2026-10-09',
+    venue: 'The Gateway, Madurai',
     budget: 180000,
     service: 'both',
     source: 'referral',
-    status: 'booked',
+    status: 'accepted',
     packageAmount: 165000,
     city: 'Madurai',
-    notes: 'Referred by Priya. Wants a film-grain album.',
-    nextAction: 'Send shot list',
-    nextActionOn: '2026-10-01',
-    events: [
-      { id: id(), name: 'Engagement', date: '2026-09-12', done: true },
-      { id: id(), name: 'Wedding', date: '2026-10-09', done: false },
-    ],
-    payments: [
-      {
-        id: id(),
-        amount: 50000,
-        kind: 'advance',
-        receivedOn: '2026-07-18',
-        note: 'Bank transfer',
-      },
-    ],
+    notes: 'They said yes. Collect advance and mark booked.',
+    nextAction: 'Collect advance and confirm booking',
+    nextActionOn: today,
+    events: defaultEvents('2026-10-09', ['Engagement', 'Wedding']),
+    payments: [],
   })
 
   const nisha = lead({
     coupleName: 'Nisha & Aditya',
     phone: '9790012345',
     eventDate: '2026-12-02',
+    venue: '',
     budget: 70000,
     service: 'photography',
-    source: 'google',
+    source: 'whatsapp',
     status: 'new',
     packageAmount: 0,
     city: 'Trichy',
-    notes: 'First enquiry: “Hi, I need wedding photography for December 2.”',
-    nextAction: 'Call and qualify',
-    nextActionOn: new Date().toISOString().slice(0, 10),
-    events: [{ id: id(), name: 'Wedding', date: '2026-12-02', done: false }],
+    notes: '“Hi, I need wedding photography for December 2.” Ask for venue, functions and budget.',
+    nextAction: 'Ask for date, venue and functions',
+    nextActionOn: today,
+    events: defaultEvents('2026-12-02', ['Wedding']),
     payments: [],
   })
 
@@ -134,7 +141,7 @@ export function seedState(): StudioState {
       packageName: 'GoldHour Signature — photo + film',
       amount: 120000,
       createdOn: '2026-08-16',
-      notes: 'Two photographers, one cinematographer, engagement already covered.',
+      notes: 'Two photographers, one cinematographer. Engagement already covered.',
     },
     {
       id: id(),
@@ -162,7 +169,7 @@ export function seedState(): StudioState {
       phone: '9876543210',
       tagline: 'Wedding photography & cinema',
     },
-    leads: [priya, rahul, divya, ananya, nisha],
+    leads: [nisha, rahul, divya, ananya, priya],
     quotations,
   }
 }
