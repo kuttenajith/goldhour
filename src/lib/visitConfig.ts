@@ -1,6 +1,6 @@
 export const VISIT_NAMESPACE = 'kuttenajith.github.io'
 export const VISIT_KEY = 'goldhour'
-export const VISIT_ENDPOINT = 'https://abacus.jsoncameron.dev'
+export const VISIT_ENDPOINT = 'https://abacus.jasoncameron.dev'
 
 const fromEnv = import.meta.env.VITE_WEB3FORMS_ACCESS_KEY
 export const WEB3FORMS_KEY =

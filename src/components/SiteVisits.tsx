@@ -59,9 +59,10 @@ function stripOwnerQuery() {
 
 async function fetchCount(action: 'get' | 'hit') {
   const response = await fetch(`${VISIT_ENDPOINT}/${action}/${VISIT_NAMESPACE}/${VISIT_KEY}`)
+  if (response.status === 404) return 0
   if (!response.ok) throw new Error('counter')
-  const data = (await response.json()) as { value: number }
-  return data.value
+  const data = (await response.json()) as { value?: number }
+  return Number(data.value) || 0
 }
 
 export function loadVisits() {
@@ -80,12 +81,11 @@ export function loadVisits() {
     if (skip) return fetchCount('get')
 
     rememberBrowser()
-    const eligible = await shouldCountAndMail()
-    if (!eligible) return fetchCount('get')
-
-    armVisitReport()
+    void shouldCountAndMail().then((eligible) => {
+      if (eligible) armVisitReport()
+    })
     return fetchCount('hit')
-  })().catch(() => null)
+  })().catch(() => 0)
 
   return visitsPromise
 }
@@ -96,19 +96,17 @@ export function SiteVisits() {
   useEffect(() => {
     let active = true
     loadVisits().then((value) => {
-      if (active) setVisits(value)
+      if (active) setVisits(value ?? 0)
     })
     return () => {
       active = false
     }
   }, [])
 
-  if (visits == null) return null
-
-  const formatted = new Intl.NumberFormat('en').format(visits)
+  const formatted = visits == null ? '…' : new Intl.NumberFormat('en').format(visits)
 
   return (
-    <span className="foot-visits" title={`${formatted} unique browsers, excluding yours`}>
+    <span className="foot-visits" title="Unique browsers, excluding yours">
       {formatted} visits
     </span>
   )
