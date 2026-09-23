@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { BrandMark } from '../components/BrandMark.tsx'
 import { Onboarding } from '../components/Onboarding.tsx'
+import { SiteVisits } from '../components/SiteVisits.tsx'
 import { logoutStudio, useStudio } from '../lib/store.ts'
 import { asset } from '../lib/paths.ts'
 import { clsx } from '../lib/clsx.ts'
@@ -70,6 +71,9 @@ export function StudioShell() {
             </div>
             <p className="mt-2 font-display text-2xl">{studio.name}</p>
             <p className="text-sm text-mute">{studio.owner}</p>
+            <p className="mt-3 text-xs text-gold-soft">
+              <SiteVisits />
+            </p>
             <button
               className="mt-4 inline-flex items-center gap-2 text-sm text-mute hover:text-cream"
               onClick={() => {

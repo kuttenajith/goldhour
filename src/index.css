@@ -75,7 +75,9 @@ textarea {
   font-family: inherit;
 }
 
-input[type='date']::-webkit-calendar-picker-indicator,
-input[type='time']::-webkit-calendar-picker-indicator {
-  filter: invert(0.85) sepia(0.4);
+.foot-visits {
+  color: var(--color-gold-soft);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 11px;
 }

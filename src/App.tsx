@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { StudioShell } from './layout/StudioShell.tsx'
 import { RequireStudio } from './layout/RequireStudio.tsx'
+import { VisitTracker } from './components/VisitTracker.tsx'
 import { Landing } from './pages/Landing.tsx'
 import { StudioLogin } from './pages/StudioLogin.tsx'
 import { Dashboard } from './pages/Dashboard.tsx'
@@ -20,6 +21,7 @@ function basename() {
 export function App() {
   return (
     <BrowserRouter basename={basename()}>
+      <VisitTracker />
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<StudioLogin />} />

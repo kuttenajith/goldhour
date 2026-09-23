@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { ArrowRight, Bell, CalendarClock, FileText, IndianRupee, MessageCircle, Users } from 'lucide-react'
 import { BrandMark } from '../components/BrandMark.tsx'
 import { Button } from '../components/Button.tsx'
+import { SiteFooter } from '../components/SiteFooter.tsx'
 import { asset } from '../lib/paths.ts'
 
 const features = [
@@ -280,12 +281,7 @@ export function Landing() {
         </div>
       </section>
 
-      <footer className="border-t border-line px-4 py-10 text-sm text-mute sm:px-6">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4">
-          <BrandMark />
-          <p>GoldHour — a studio desk for India’s wedding vendors.</p>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   )
 }

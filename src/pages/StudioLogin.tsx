@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { BrandMark } from '../components/BrandMark.tsx'
 import { Button } from '../components/Button.tsx'
 import { Field, fieldClass } from '../components/Field.tsx'
+import { SiteVisits } from '../components/SiteVisits.tsx'
 import { loginStudio } from '../lib/store.ts'
 import { DEMO_PIN } from '../lib/seed.ts'
 import { asset } from '../lib/paths.ts'
@@ -60,6 +61,9 @@ export function StudioLogin() {
             Enter the studio desk
           </Button>
         </form>
+        <p className="mt-10 text-xs text-mute">
+          <SiteVisits />
+        </p>
       </div>
     </div>
   )
