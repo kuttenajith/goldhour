@@ -1,15 +1,19 @@
 {
   "name": "goldhour",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build && bun scripts/copy-404.mjs",
+    "dev": "concurrently -k \"npm:dev:api\" \"npm:dev:ui\"",
+    "dev:ui": "vite",
+    "dev:api": "tsx watch --env-file=.env.local server/dev.ts",
+    "build": "tsc -b && vite build && node scripts/copy-404.mjs",
     "lint": "oxlint src",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.0.2",
+    "hono": "^4.11.3",
     "jspdf": "^4.2.1",
     "lucide-react": "^1.43.0",
     "react": "^19.2.8",
@@ -17,13 +21,16 @@
     "react-router-dom": "^7.18.3"
   },
   "devDependencies": {
+    "@hono/node-server": "^1.19.9",
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "^6.1.0",
+    "concurrently": "^9.2.1",
     "oxlint": "^1.79.0",
     "tailwindcss": "^4.3.3",
+    "tsx": "^4.21.0",
     "typescript": "~6.0.2",
     "vite": "^8.2.2"
   }

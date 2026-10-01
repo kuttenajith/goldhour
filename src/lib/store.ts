@@ -1,35 +1,32 @@
 import { useSyncExternalStore } from 'react'
 import { normalizeLead } from './booking.ts'
-import { seedState } from './seed.ts'
-import type { Lead, Payment, Quotation, StudioProfile, StudioState } from './types.ts'
+import type { Lead, Payment, Quotation, StudioProfile, StudioSnapshot } from './types.ts'
 
-const KEY = 'goldhour.studio.v2'
-const SESSION = 'goldhour.session'
-const ONBOARD = 'goldhour.onboarded.v1'
+const EMPTY: StudioSnapshot = {
+  email: '',
+  isDemo: false,
+  onboarded: true,
+  studio: { name: '', owner: '', city: '', phone: '', tagline: '' },
+  leads: [],
+  quotations: [],
+  billing: {
+    plan: 'trial',
+    status: 'trialing',
+    trialEndsOn: '',
+    periodEndsOn: null,
+    active: true,
+  },
+}
 
-let memory = read()
+type Session =
+  | { status: 'unknown' }
+  | { status: 'guest' }
+  | { status: 'in'; data: StudioSnapshot }
+
+let session: Session = { status: 'unknown' }
 const listeners = new Set<() => void>()
 
-function hydrate(raw: StudioState): StudioState {
-  return {
-    ...raw,
-    leads: raw.leads.map(normalizeLead),
-  }
-}
-
-function read(): StudioState {
-  try {
-    const raw = localStorage.getItem(KEY)
-    if (!raw) return seedState()
-    return hydrate(JSON.parse(raw) as StudioState)
-  } catch {
-    return seedState()
-  }
-}
-
-function write(next: StudioState) {
-  memory = next
-  localStorage.setItem(KEY, JSON.stringify(next))
+function emit() {
   listeners.forEach((fn) => fn())
 }
 
@@ -38,58 +35,131 @@ function subscribe(fn: () => void) {
   return () => listeners.delete(fn)
 }
 
-function snapshot() {
-  return memory
+function hydrate(raw: StudioSnapshot): StudioSnapshot {
+  return {
+    ...raw,
+    leads: raw.leads.map(normalizeLead),
+  }
+}
+
+function apply(next: Session) {
+  session = next
+  emit()
+}
+
+export async function api<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(path, {
+    credentials: 'include',
+    ...init,
+    headers: {
+      'content-type': 'application/json',
+      ...(init?.headers || {}),
+    },
+  })
+  const data = (await res.json().catch(() => ({}))) as T & { error?: string }
+  if (!res.ok) {
+    throw new Error(data.error || `Request failed (${res.status})`)
+  }
+  return data
+}
+
+export async function bootSession() {
+  try {
+    const data = await api<StudioSnapshot>('/api/studio')
+    apply({ status: 'in', data: hydrate(data) })
+  } catch {
+    apply({ status: 'guest' })
+  }
+}
+
+function current(): StudioSnapshot {
+  return session.status === 'in' ? session.data : EMPTY
+}
+
+async function persist(next: StudioSnapshot) {
+  apply({ status: 'in', data: next })
+  try {
+    const data = await api<StudioSnapshot>('/api/studio', {
+      method: 'PUT',
+      body: JSON.stringify({
+        studio: next.studio,
+        leads: next.leads,
+        quotations: next.quotations,
+        onboarded: next.onboarded,
+      }),
+    })
+    apply({ status: 'in', data: hydrate(data) })
+  } catch (err) {
+    if (err instanceof Error && err.message.includes('Sign in')) {
+      apply({ status: 'guest' })
+    }
+  }
+}
+
+export function useSession() {
+  return useSyncExternalStore(subscribe, () => session, () => session)
 }
 
 export function useStudio() {
-  return useSyncExternalStore(subscribe, snapshot, snapshot)
+  return useSyncExternalStore(subscribe, current, current)
 }
 
 export function isAuthed() {
-  return sessionStorage.getItem(SESSION) === '1'
+  return session.status === 'in'
 }
 
-export function loginStudio() {
-  sessionStorage.setItem(SESSION, '1')
+export function sessionStatus() {
+  return session.status
 }
 
-export function logoutStudio() {
-  sessionStorage.removeItem(SESSION)
+export function acceptSession(data: StudioSnapshot) {
+  apply({ status: 'in', data: hydrate(data) })
+}
+
+export async function logoutStudio() {
+  try {
+    await api('/api/auth/logout', { method: 'POST', body: '{}' })
+  } catch {
+    /* still leave */
+  }
+  apply({ status: 'guest' })
 }
 
 export function needsOnboarding() {
-  return localStorage.getItem(ONBOARD) !== '1'
+  return session.status === 'in' && !session.data.onboarded
 }
 
 export function completeOnboarding() {
-  localStorage.setItem(ONBOARD, '1')
+  const now = current()
+  void persist({ ...now, onboarded: true })
 }
 
 export function resetDemo() {
-  localStorage.removeItem(ONBOARD)
-  write(seedState())
+  void api<StudioSnapshot>('/api/studio/reset-demo', { method: 'POST', body: '{}' }).then((data) => {
+    apply({ status: 'in', data: hydrate(data) })
+  })
 }
 
 export function updateStudio(patch: Partial<StudioProfile>) {
-  write({ ...memory, studio: { ...memory.studio, ...patch } })
+  const now = current()
+  void persist({ ...now, studio: { ...now.studio, ...patch } })
 }
 
 export function upsertLead(lead: Lead) {
+  const now = current()
   const next = normalizeLead(lead)
-  const exists = memory.leads.some((l) => l.id === next.id)
-  write({
-    ...memory,
-    leads: exists
-      ? memory.leads.map((l) => (l.id === next.id ? next : l))
-      : [next, ...memory.leads],
+  const exists = now.leads.some((l) => l.id === next.id)
+  void persist({
+    ...now,
+    leads: exists ? now.leads.map((l) => (l.id === next.id ? next : l)) : [next, ...now.leads],
   })
 }
 
 export function patchLead(leadId: string, patch: Partial<Lead> | ((lead: Lead) => Lead)) {
-  write({
-    ...memory,
-    leads: memory.leads.map((l) => {
+  const now = current()
+  void persist({
+    ...now,
+    leads: now.leads.map((l) => {
       if (l.id !== leadId) return l
       const next = typeof patch === 'function' ? patch(l) : { ...l, ...patch }
       return normalizeLead(next)
@@ -98,10 +168,11 @@ export function patchLead(leadId: string, patch: Partial<Lead> | ((lead: Lead) =
 }
 
 export function removeLead(id: string) {
-  write({
-    ...memory,
-    leads: memory.leads.filter((l) => l.id !== id),
-    quotations: memory.quotations.filter((q) => q.leadId !== id),
+  const now = current()
+  void persist({
+    ...now,
+    leads: now.leads.filter((l) => l.id !== id),
+    quotations: now.quotations.filter((q) => q.leadId !== id),
   })
 }
 
@@ -110,10 +181,8 @@ export function addPayment(leadId: string, payment: Payment) {
 }
 
 export function addQuotation(quotation: Quotation) {
-  write({
-    ...memory,
-    quotations: [quotation, ...memory.quotations],
-  })
+  const now = current()
+  void persist({ ...now, quotations: [quotation, ...now.quotations] })
 }
 
 export function setNextAction(leadId: string, nextAction: string, nextActionOn: string, status?: Lead['status']) {

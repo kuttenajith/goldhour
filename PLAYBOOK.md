@@ -32,7 +32,7 @@ Mix:
 
 Where: Instagram (`Madurai wedding photographer`), Facebook groups, Google Maps, WhatsApp business groups, local exhibitions.
 
-Send: https://kuttenajith.github.io/goldhour/
+Send: https://goldhour-chi.vercel.app — they create their own studio (14-day trial) or open the demo with PIN `2026`.
 
 ## Week 3 — watch, don't ask “do you like it?”
 
@@ -61,10 +61,8 @@ Write down every hop: WhatsApp → notes → calendar → Excel → PDF → UPI 
 
 Build nothing they did not touch.
 
-Then ask: would you pay ₹500–₹1,000/month for this?
+Then ask: would you pay ₹799/month for this? Checkout is in the desk (Razorpay). Add `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` on Vercel when you are ready to take money.
 
 ## Do not build yet
 
-Google login, Razorpay, PostgreSQL, AWS, Docker, RBAC, a mobile app, AI, analytics dashboards, assistant logins.
-
-Those wait until a studio says they have been using it for three weeks and want to continue.
+Google login, a mobile app, AI, invoice/contract until a paying studio asks twice.

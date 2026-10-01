@@ -125,7 +125,7 @@ export function LeadForm({
         />
       </Field>
       <div className="sm:col-span-2">
-        <p className="mb-2 text-[11px] uppercase tracking-[0.18em] text-mute">Events</p>
+        <p className="mb-2 text-[13px] font-semibold uppercase tracking-[0.08em] text-mute">Events</p>
         <div className="flex flex-wrap gap-2">
           {FUNCTION_NAMES.map((name) => {
             const on = selected.includes(name)

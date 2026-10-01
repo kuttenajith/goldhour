@@ -34,8 +34,8 @@ export function Bookings() {
               </div>
               <StatusPill status={l.status} />
             </div>
-            <p className="mt-4 font-display text-2xl text-gold-soft">{money(l.packageAmount)}</p>
-            <p className="mt-1 text-sm text-mute">
+            <p className="mt-4 font-display text-2xl tabular-nums text-gold-soft">{money(l.packageAmount)}</p>
+            <p className="mt-1 text-sm tabular-nums text-mute">
               Advance {money(paidOf(l, 'advance'))}
               {paidOf(l, 'advance') >= l.plan.advance && l.plan.advance > 0 ? ' ✓' : ''} · Outstanding{' '}
               {money(Math.max(0, l.packageAmount - l.payments.reduce((s, p) => s + p.amount, 0)))}

@@ -91,3 +91,18 @@ export interface StudioState {
   leads: Lead[]
   quotations: Quotation[]
 }
+
+export interface Billing {
+  plan: string
+  status: 'trialing' | 'active' | 'expired' | string
+  trialEndsOn: string
+  periodEndsOn: string | null
+  active: boolean
+}
+
+export interface StudioSnapshot extends StudioState {
+  email: string
+  isDemo: boolean
+  onboarded: boolean
+  billing: Billing
+}

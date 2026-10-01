@@ -56,20 +56,20 @@ export function Leads() {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="font-display text-2xl">{l.coupleName}</p>
-                <p className="mt-1 text-xs text-mute">
+                <p className="mt-1 text-sm text-mute">
                   {day(l.eventDate)} · {l.venue || l.city || 'Venue pending'}
                 </p>
               </div>
               <StatusPill status={l.status} />
             </div>
-            <p className="mt-3 text-gold-soft">{money(l.packageAmount || l.budget)}</p>
+            <p className="mt-3 text-lg font-semibold tabular-nums text-gold-soft">{money(l.packageAmount || l.budget)}</p>
           </Link>
         ))}
       </div>
 
       <div className="hidden overflow-x-auto rounded-3xl border border-line md:block">
-        <table className="w-full min-w-[640px] text-left text-sm">
-          <thead className="bg-ink-2 text-[11px] uppercase tracking-[0.18em] text-mute">
+        <table className="w-full min-w-[640px] text-left text-base">
+          <thead className="bg-ink-2 text-sm font-semibold uppercase tracking-[0.06em] text-mute">
             <tr>
               <th className="px-4 py-3 font-normal">Name</th>
               <th className="px-4 py-3 font-normal">Phone</th>

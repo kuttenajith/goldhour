@@ -1,8 +1,9 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
   Bell,
   CalendarDays,
   Camera,
+  CreditCard,
   FileText,
   IndianRupee,
   LayoutDashboard,
@@ -23,10 +24,11 @@ const links = [
   { to: '/studio/follow-ups', label: 'Follow-ups', icon: Bell },
   { to: '/studio/quotations', label: 'Quotations', icon: FileText },
   { to: '/studio/payments', label: 'Payments', icon: IndianRupee },
+  { to: '/studio/billing', label: 'Plan', icon: CreditCard },
 ]
 
 export function StudioShell() {
-  const { studio } = useStudio()
+  const { studio, billing } = useStudio()
   const navigate = useNavigate()
 
   return (
@@ -112,6 +114,14 @@ export function StudioShell() {
           ))}
         </nav>
         <main className="px-4 py-6 sm:px-8 sm:py-8">
+          {billing.status === 'trialing' ? (
+            <Link
+              to="/studio/billing"
+              className="mb-6 block rounded-2xl border border-gold/40 bg-gold/10 px-4 py-3 text-sm text-gold-soft"
+            >
+              Trial until {billing.trialEndsOn}. Subscribe so the desk stays on after that.
+            </Link>
+          ) : null}
           <Outlet />
         </main>
       </div>

@@ -290,8 +290,8 @@ export function LeadDetail() {
 function Fact({ label, value }: { label: string; value: string }) {
   return (
     <article className="rounded-3xl border border-line bg-ink-2 p-4 sm:p-5">
-      <p className="text-[10px] uppercase tracking-[0.2em] text-mute sm:text-xs">{label}</p>
-      <p className="mt-2 font-display text-2xl text-gold-soft sm:text-3xl">{value}</p>
+      <p className="text-sm font-semibold uppercase tracking-[0.08em] text-mute">{label}</p>
+      <p className="mt-2 font-display text-2xl tabular-nums text-gold-soft sm:text-3xl">{value}</p>
     </article>
   )
 }
@@ -319,7 +319,7 @@ function PaymentBoard({ lead }: { lead: Lead }) {
   return (
     <article className="rounded-3xl border border-line bg-ink-2 p-5 sm:p-6">
       <p className="text-xs uppercase tracking-[0.22em] text-mute">Payments</p>
-      <p className="mt-2 font-display text-3xl">{money(lead.packageAmount || lead.budget)} total</p>
+      <p className="mt-2 font-display text-3xl tabular-nums">{money(lead.packageAmount || lead.budget)} total</p>
       <ul className="mt-5 space-y-3">
         {stages.map((stage) => {
           const got = paidOf(lead, stage.kind)
@@ -329,11 +329,11 @@ function PaymentBoard({ lead }: { lead: Lead }) {
               <span>
                 {stage.label}
                 {done ? ' ✓' : ''}
-                <span className="ml-2 text-xs text-mute">
+                <span className="ml-2 text-sm tabular-nums text-mute">
                   {money(got)} / {money(stage.due)}
                 </span>
               </span>
-              <span className="text-gold-soft">{money(stage.due)}</span>
+              <span className="text-lg font-semibold tabular-nums text-gold-soft">{money(stage.due)}</span>
             </li>
           )
         })}

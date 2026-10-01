@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from './Button.tsx'
-import { completeOnboarding, needsOnboarding, useStudio } from '../lib/store.ts'
+import { completeOnboarding, useSession, useStudio } from '../lib/store.ts'
 
 const steps = [
   {
@@ -18,25 +18,26 @@ const steps = [
   },
   {
     title: 'Run one wedding',
-    copy: 'Priya & Arjun is already booked in the demo. Open it and walk the whole day before you give GoldHour to a real studio.',
+    copy: 'Open a booked couple and walk the day: payments, events, timeline. Then put your next real enquiry on this desk.',
   },
 ]
 
 export function Onboarding() {
-  const [open, setOpen] = useState(needsOnboarding)
+  const session = useSession()
+  const [skipped, setSkipped] = useState(false)
   const [step, setStep] = useState(0)
   const { leads } = useStudio()
   const navigate = useNavigate()
   const priya = leads.find((l) => l.coupleName.startsWith('Priya'))
 
-  if (!open) return null
+  if (skipped || session.status !== 'in' || session.data.onboarded) return null
 
   const last = step === steps.length - 1
   const current = steps[step]
 
   function finish() {
     completeOnboarding()
-    setOpen(false)
+    setSkipped(true)
     if (priya) navigate(`/studio/leads/${priya.id}`)
   }
 
@@ -53,13 +54,13 @@ export function Onboarding() {
             tone="ghost"
             onClick={() => {
               completeOnboarding()
-              setOpen(false)
+              setSkipped(true)
             }}
           >
             Skip
           </Button>
           {last ? (
-            <Button onClick={finish}>Open Priya’s wedding</Button>
+            <Button onClick={finish}>{priya ? 'Open Priya’s wedding' : 'Open the desk'}</Button>
           ) : (
             <Button onClick={() => setStep((s) => s + 1)}>Next</Button>
           )}

@@ -1,36 +1,40 @@
 # GoldHour
 
-**The studio desk for wedding photographers.**
+**The studio desk for wedding photographers.** Now with accounts, a TypeScript API, Postgres, and Razorpay billing.
 
-Run one wedding: enquiry → quotation → follow-up → booked → payments → day-of timeline.
+Live: [goldhour-chi.vercel.app](https://goldhour-chi.vercel.app)
 
-Live: [kuttenajith.github.io/goldhour](https://kuttenajith.github.io/goldhour)
+- **Start a studio:** `/signup` — 14-day trial, data on the server
+- **Demo:** `/login` → PIN `2026` (Meenakshi Frames, Madurai)
+- **Subscribe:** `/studio/billing` — Razorpay, ₹799 / ₹1,499 a month
 
-PIN: `2026` · Demo: **Meenakshi Frames, Madurai**
+## What a photographer can do
 
-If the desk looks like an older version, open Payments → **Reset demo data**.
-
-## What a photographer can do today
-
-1. **New enquiry** — name, phone, date, venue, events, budget, source
-2. **Quote → booked** — PDF, WhatsApp, Accepted, then Booked
-3. **Follow-up** — 2 days, then 5 if there is no response
-4. **Payments** — advance, before wedding, final delivery, outstanding
-5. **Wedding-day timeline** — 06:00 getting ready through portraits
-6. **WhatsApp** — qualify, quote, follow up, remind for money, remind for the day
-
-No backend. Data stays in the browser. That is enough to sit with five studios.
-
-## Next step (founder)
-
-Read [PLAYBOOK.md](./PLAYBOOK.md). Contact 20 photographers. Get 5 using a real booking. Do not add Razorpay yet.
+1. Sign up and keep leads on their own account
+2. Enquiry → personalised quote PDF → WhatsApp follow-up → booked
+3. Track advance / before wedding / final delivery
+4. Pay GoldHour with Razorpay after the trial
 
 ## Run locally
 
 ```bash
-bun install
-bun dev
+cp .env.example .env.local
+# optional: set DATABASE_URL (Neon). Without it, local data is `.data/goldhour.json`
+npm install
+npm run dev
 ```
+
+UI: http://localhost:5173 · API: http://localhost:8788
+
+## Production env (Vercel)
+
+| Variable | Why |
+| --- | --- |
+| `DATABASE_URL` | Neon Postgres |
+| `JWT_SECRET` | Session cookies |
+| `RAZORPAY_KEY_ID` | Checkout |
+| `RAZORPAY_KEY_SECRET` | Orders + signature |
+| `RAZORPAY_WEBHOOK_SECRET` | `https://goldhour-chi.vercel.app/api/billing/webhook` |
 
 ## License
 

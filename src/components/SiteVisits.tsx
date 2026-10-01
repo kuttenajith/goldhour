@@ -9,7 +9,8 @@ const COOKIE = 'gh-goldhour-skip=1'
 let visitsPromise: Promise<number | null> | null = null
 
 function isLive() {
-  return window.location.hostname === 'kuttenajith.github.io'
+  const host = window.location.hostname
+  return host === 'kuttenajith.github.io' || host.endsWith('.vercel.app')
 }
 
 function isBot() {

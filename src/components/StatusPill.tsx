@@ -17,7 +17,7 @@ export function StatusPill({ status }: { status: LeadStatus }) {
   return (
     <span
       className={clsx(
-        'inline-flex rounded-full border px-2.5 py-0.5 text-[11px] tracking-wide uppercase',
+        'inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold tracking-wide uppercase',
         tone[status],
       )}
     >

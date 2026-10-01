@@ -1,9 +1,11 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { StudioShell } from './layout/StudioShell.tsx'
-import { RequireStudio } from './layout/RequireStudio.tsx'
+import { RequireAuth, RequireStudio } from './layout/RequireStudio.tsx'
 import { VisitTracker } from './components/VisitTracker.tsx'
 import { Landing } from './pages/Landing.tsx'
 import { StudioLogin } from './pages/StudioLogin.tsx'
+import { Signup } from './pages/Signup.tsx'
+import { Billing } from './pages/Billing.tsx'
 import { Dashboard } from './pages/Dashboard.tsx'
 import { Leads } from './pages/Leads.tsx'
 import { LeadDetail } from './pages/LeadDetail.tsx'
@@ -11,6 +13,9 @@ import { FollowUps } from './pages/FollowUps.tsx'
 import { Quotations } from './pages/Quotations.tsx'
 import { Payments } from './pages/Payments.tsx'
 import { Bookings } from './pages/Bookings.tsx'
+import { bootSession } from './lib/store.ts'
+
+bootSession()
 
 function basename() {
   const raw = import.meta.env.BASE_URL
@@ -25,6 +30,10 @@ export function App() {
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<StudioLogin />} />
+        <Route path="/signup" element={<Signup />} />
+        <Route element={<RequireAuth />}>
+          <Route path="/studio/billing" element={<Billing />} />
+        </Route>
         <Route element={<RequireStudio />}>
           <Route path="/studio" element={<StudioShell />}>
             <Route index element={<Dashboard />} />

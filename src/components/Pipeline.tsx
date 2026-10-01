@@ -24,10 +24,10 @@ export function Pipeline({ status }: { status: LeadStatus }) {
             i <= idx ? 'border-gold/50 bg-gold/10 text-gold-soft' : 'border-line text-mute',
           )}
         >
-          <span className="block text-[10px] uppercase tracking-[0.16em] sm:text-[11px]">
+          <span className="block text-sm font-semibold tabular-nums">
             {i + 1}
           </span>
-          <span className="mt-1 block text-xs sm:text-sm">{STATUS_LABEL[step]}</span>
+          <span className="mt-1 block text-sm font-medium sm:text-base">{STATUS_LABEL[step]}</span>
         </li>
       ))}
     </ol>

@@ -40,23 +40,25 @@ const features = [
 
 const prices = [
   {
-    name: 'Pilot',
+    name: 'Trial',
     price: '₹0',
-    note: 'First 5 studios. Real bookings. This season only.',
-    items: ['One complete wedding workflow', 'Quotations + WhatsApp', 'Follow-ups', 'Payment stages', 'Day-of timeline'],
+    note: '14 days. Your own studio account, on the server.',
+    items: ['Leads and bookings', 'Personalised quotations', 'WhatsApp follow-ups', 'Payment stages', 'Day-of timeline'],
+    featured: false,
   },
   {
     name: 'Studio',
     price: '₹799',
-    note: 'When someone asks to keep using it.',
-    items: ['Unlimited bookings', 'Quotations', 'Payments', 'Follow-ups', 'WhatsApp templates'],
+    note: 'After the trial, if the desk is still open every morning.',
+    items: ['Unlimited bookings', 'Quotations', 'Couple payments', 'Follow-ups', 'WhatsApp templates'],
     featured: true,
   },
   {
     name: 'Studio Pro',
     price: '₹1,499',
-    note: 'Only after a studio needs a second login.',
-    items: ['Multiple seats', 'Team desk', 'Reports later', 'Not built yet — on purpose'],
+    note: 'Same desk, billed as Pro when the studio is ready.',
+    items: ['Everything in Studio', 'Priority setup', 'Reports next', 'Invoice + contract next'],
+    featured: false,
   },
 ]
 
@@ -76,12 +78,12 @@ export function Landing() {
             <a href="#start" className="hover:text-cream">
               For studios
             </a>
-            <Link to="/login">
-              <Button>Open studio desk</Button>
+            <Link to="/signup">
+              <Button>Start free trial</Button>
             </Link>
           </nav>
-          <Link to="/login" className="md:hidden">
-            <Button>Open desk</Button>
+          <Link to="/signup" className="md:hidden">
+            <Button>Start trial</Button>
           </Link>
         </div>
       </header>
@@ -97,7 +99,7 @@ export function Landing() {
           <p className="text-xs uppercase tracking-[0.35em] text-gold-soft">
             Built for the people who make money from weddings
           </p>
-          <h1 className="mt-5 max-w-3xl font-display text-5xl leading-[0.95] text-cream sm:text-7xl">
+          <h1 className="mt-5 max-w-3xl font-display text-5xl leading-tight text-cream sm:text-7xl">
             The studio desk for wedding photographers.
           </h1>
           <p className="mt-6 max-w-xl text-lg text-cream/80">
@@ -105,16 +107,16 @@ export function Landing() {
             day-of timeline. Built for studios, not for brides.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <Link to="/login">
+            <Link to="/signup">
               <Button className="px-6 py-3">
-                Try the Madurai demo <ArrowRight size={16} />
+                Start 14-day trial <ArrowRight size={16} />
               </Button>
             </Link>
-            <a href="#product">
+            <Link to="/login">
               <Button tone="ghost" className="px-6 py-3">
-                See the desk
+                Sign in / demo
               </Button>
-            </a>
+            </Link>
           </div>
         </div>
       </section>
@@ -128,7 +130,7 @@ export function Landing() {
         ].map(([src, alt]) => (
           <figure key={src} className="relative overflow-hidden rounded-2xl">
             <img src={asset(src)} alt={alt} className="aspect-[4/5] w-full object-cover md:aspect-[4/3]" />
-            <figcaption className="absolute bottom-3 left-3 text-[11px] uppercase tracking-[0.2em] text-cream/80">
+            <figcaption className="absolute bottom-3 left-3 text-sm font-semibold uppercase tracking-[0.08em] text-cream/80">
               {alt}
             </figcaption>
           </figure>
@@ -170,7 +172,7 @@ export function Landing() {
               <article key={f.title} className="rounded-3xl border border-line bg-ink p-6">
                 <f.icon className="text-gold" size={22} />
                 <h3 className="mt-4 font-display text-3xl">{f.title}</h3>
-                <p className="mt-3 text-sm leading-relaxed text-mute">{f.copy}</p>
+                <p className="mt-3 text-base leading-relaxed text-mute">{f.copy}</p>
               </article>
             ))}
           </div>
@@ -199,7 +201,7 @@ export function Landing() {
               ].map(([n, p]) => (
                 <div key={n} className="mt-4 flex items-center justify-between border-b border-line pb-3">
                   <span>{n}</span>
-                  <span className="text-gold-soft">{p}</span>
+                  <span className="text-lg font-semibold tabular-nums text-gold-soft">{p}</span>
                 </div>
               ))}
             </div>
@@ -221,11 +223,11 @@ export function Landing() {
       </section>
 
       <section id="pricing" className="mx-auto max-w-6xl px-4 py-24 sm:px-6">
-        <p className="text-xs uppercase tracking-[0.3em] text-gold">Who pays — later</p>
-        <h2 className="mt-4 font-display text-4xl sm:text-5xl">The vendor. After five studios have used it.</h2>
+        <p className="text-xs uppercase tracking-[0.3em] text-gold">Price</p>
+        <h2 className="mt-4 font-display text-4xl sm:text-5xl">Fourteen days free. Then the studio pays.</h2>
         <p className="mt-4 max-w-xl text-mute">
-          Prices below are a starting point, not a pitch. First get five photographers running real
-          bookings for free. Then ask what they would miss if GoldHour disappeared.
+          Create an account, run real bookings, pay ₹799 / month when the trial ends. Razorpay checkout is
+          in the desk.
         </p>
         <div className="mt-12 grid gap-5 lg:grid-cols-3">
           {prices.map((p) => (
@@ -238,7 +240,7 @@ export function Landing() {
               }
             >
               <p className="text-xs uppercase tracking-[0.22em] opacity-70">{p.name}</p>
-              <p className="mt-3 font-display text-5xl">
+              <p className="mt-3 font-display text-5xl tabular-nums">
                 {p.price}
                 <span className="text-lg opacity-70"> / month</span>
               </p>
@@ -248,6 +250,9 @@ export function Landing() {
                   <li key={item}>— {item}</li>
                 ))}
               </ul>
+              <Link to="/signup" className="mt-6 inline-block">
+                <Button tone={p.featured ? 'cream' : 'gold'}>Start trial</Button>
+              </Link>
             </article>
           ))}
         </div>
@@ -265,9 +270,9 @@ export function Landing() {
               studios a free season. Watch how they work. GoldHour is the product you put in their
               hands.
             </p>
-            <Link to="/login" className="mt-8 inline-block">
+            <Link to="/signup" className="mt-8 inline-block">
               <Button>
-                Open the demo studio <ArrowRight size={16} />
+                Create a studio account <ArrowRight size={16} />
               </Button>
             </Link>
           </div>

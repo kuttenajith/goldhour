@@ -50,7 +50,7 @@ export function Dashboard() {
         ].map(([k, v]) => (
           <article key={k} className="rounded-3xl border border-line bg-ink-2 p-5">
             <p className="text-xs uppercase tracking-[0.2em] text-mute">{k}</p>
-            <p className="mt-3 font-display text-3xl text-gold-soft sm:text-4xl">{v}</p>
+            <p className="mt-3 font-display text-3xl tabular-nums text-gold-soft sm:text-4xl">{v}</p>
           </article>
         ))}
       </div>

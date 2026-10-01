@@ -5,7 +5,7 @@ import { resetDemo, useStudio } from '../lib/store.ts'
 import { Button } from '../components/Button.tsx'
 
 export function Payments() {
-  const { leads } = useStudio()
+  const { leads, isDemo } = useStudio()
   const rows = leads.filter((l) => l.packageAmount > 0)
 
   return (
@@ -15,17 +15,19 @@ export function Payments() {
           <p className="text-xs uppercase tracking-[0.28em] text-gold-soft">Ledger</p>
           <h1 className="mt-2 font-display text-4xl sm:text-5xl">Payments</h1>
         </div>
-        <Button tone="ghost" onClick={resetDemo}>
-          Reset demo data
-        </Button>
+        {isDemo ? (
+          <Button tone="ghost" onClick={resetDemo}>
+            Reset demo data
+          </Button>
+        ) : null}
       </div>
 
       <div className="grid gap-3 md:hidden">
         {rows.map((l) => (
           <Link key={l.id} to={`/studio/leads/${l.id}`} className="rounded-3xl border border-line bg-ink-2 p-4">
             <p className="font-display text-2xl">{l.coupleName}</p>
-            <p className="mt-2 text-sm text-gold-soft">{money(l.packageAmount)}</p>
-            <p className="mt-1 text-xs text-mute">
+            <p className="mt-2 text-lg font-semibold tabular-nums text-gold-soft">{money(l.packageAmount)}</p>
+            <p className="mt-1 text-sm tabular-nums text-mute">
               Advance {money(paidOf(l, 'advance'))} · Before {money(paidOf(l, 'before_wedding'))} · Final{' '}
               {money(paidOf(l, 'final_delivery'))}
             </p>
@@ -35,8 +37,8 @@ export function Payments() {
       </div>
 
       <div className="hidden overflow-x-auto rounded-3xl border border-line md:block">
-        <table className="w-full min-w-[720px] text-left text-sm">
-          <thead className="bg-ink-2 text-[11px] uppercase tracking-[0.18em] text-mute">
+        <table className="w-full min-w-[720px] text-left text-base tabular-nums">
+          <thead className="bg-ink-2 text-sm font-semibold uppercase tracking-[0.06em] text-mute">
             <tr>
               <th className="px-4 py-3 font-normal">Couple</th>
               <th className="px-4 py-3 font-normal">Total</th>

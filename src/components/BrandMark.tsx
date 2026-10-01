@@ -9,7 +9,7 @@ export function BrandMark({ className }: { className?: string }) {
         alt=""
         className="h-8 w-8 rounded-full object-cover ring-1 ring-gold/40"
       />
-      <span className="font-display text-2xl leading-none tracking-wide text-cream">GoldHour</span>
+      <span className="font-display text-2xl leading-none tracking-tight text-cream">GoldHour</span>
     </span>
   )
 }
