@@ -118,6 +118,8 @@ type FileShape = {
 }
 
 function fileStore(path: string): Store {
+  const { mkdirSync, readFileSync, writeFileSync, existsSync } = require('node:fs') as typeof import('node:fs')
+  const { dirname } = require('node:path') as typeof import('node:path')
   const empty = (): FileShape => ({ users: [], studios: [], subs: [], orders: [] })
 
   function read(): FileShape {
