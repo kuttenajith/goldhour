@@ -66,6 +66,7 @@ export type Store = {
   markOrderPaid(razorpayOrderId: string, paymentId: string): Promise<void>
   ensureDemo(): Promise<UserRow>
   listTenants(): Promise<TenantPublic[]>
+  updatePassword(userId: string, passwordHash: string): Promise<void>
 }
 
 function publicUser(user: UserRow): TenantPublic['user'] {
@@ -161,7 +162,8 @@ function fileStore(path: string): Store {
       write(read())
     },
     async findUserByEmail(email) {
-      return read().users.find((u) => u.email === email) ?? null
+      const needle = email.trim().toLowerCase()
+      return read().users.find((u) => u.email.toLowerCase() === needle) ?? null
     },
     async findUserById(id) {
       return read().users.find((u) => u.id === id) ?? null
@@ -231,6 +233,13 @@ function fileStore(path: string): Store {
         sub: db.subs.find((s) => s.userId === user.id) ?? null,
       }))
     },
+    async updatePassword(userId, passwordHash) {
+      const db = read()
+      const user = db.users.find((u) => u.id === userId)
+      if (!user) return
+      user.passwordHash = passwordHash
+      write(db)
+    },
   }
   return store
 }
@@ -277,8 +286,16 @@ function postgresStore(url: string): Store {
       )`
     },
     async findUserByEmail(email) {
-      const rows = await sql`SELECT id, email, password_hash AS "passwordHash", created_at AS "createdAt" FROM users WHERE email = ${email}`
-      return (rows[0] as UserRow) ?? null
+      const needle = email.trim().toLowerCase()
+      const rows = await sql`SELECT id, email, password_hash AS "passwordHash", created_at AS "createdAt" FROM users WHERE lower(email) = ${needle}`
+      const row = rows[0] as (UserRow & { password_hash?: string }) | undefined
+      if (!row) return null
+      return {
+        id: row.id,
+        email: String(row.email).toLowerCase(),
+        passwordHash: row.passwordHash || row.password_hash || '',
+        createdAt: typeof row.createdAt === 'string' ? row.createdAt : new Date(row.createdAt).toISOString(),
+      }
     },
     async findUserById(id) {
       const rows = await sql`SELECT id, email, password_hash AS "passwordHash", created_at AS "createdAt" FROM users WHERE id = ${id}`
@@ -380,6 +397,9 @@ function postgresStore(url: string): Store {
         studio: studioByUser.get(user.id) ?? null,
         sub: subByUser.get(user.id) ?? null,
       }))
+    },
+    async updatePassword(userId, passwordHash) {
+      await sql`UPDATE users SET password_hash = ${passwordHash} WHERE id = ${userId}`
     },
   }
   return store

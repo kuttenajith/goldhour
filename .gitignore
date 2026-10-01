@@ -17,6 +17,7 @@ dist-ssr
 .neon
 package-lock.json
 api/_bundle.mjs
+.tmp-*
 
 # Editor directories and files
 .vscode/*

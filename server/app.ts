@@ -118,6 +118,31 @@ async function claimAdmin(password: string) {
   return user
 }
 
+async function ensureHq(userId: string) {
+  const db = getStore()
+  const studio = await db.getStudio(userId)
+  if (!studio) {
+    await db.upsertStudio({
+      ...emptyStudio(userId, {
+        name: 'GoldHour HQ',
+        owner: 'Ajith',
+        city: 'Madurai',
+        tagline: 'Operator desk',
+      }),
+      onboarded: true,
+    })
+  }
+  const sub = await db.getSub(userId)
+  await db.upsertSub({
+    userId,
+    plan: 'hq',
+    status: 'active',
+    trialEndsOn: '2099-12-31',
+    periodEndsOn: '2099-12-31',
+    razorpayPaymentId: sub?.razorpayPaymentId ?? null,
+  })
+}
+
 app.get('/health', (c) => c.json({ ok: true }))
 
 let ready = false
@@ -216,16 +241,27 @@ app.post('/auth/login', async (c) => {
   const password = body.password || ''
   const db = getStore()
   let user = await db.findUserByEmail(email)
-  if (!user && isAdminEmail(email)) {
-    try {
-      user = await claimAdmin(password)
-    } catch (err) {
-      if (err instanceof Error && err.message === 'ADMIN_PASSWORD') {
-        return c.json({ error: 'Set an 8+ character password on first HQ sign-in.' }, 400)
-      }
-      throw err
+  if (isAdminEmail(email)) {
+    if (password.length < 8) {
+      return c.json({ error: 'HQ password must be 8+ characters.' }, 400)
     }
-  } else if (!user || !verifyPassword(password, user.passwordHash)) {
+    if (!user) {
+      try {
+        user = await claimAdmin(password)
+      } catch (err) {
+        if (err instanceof Error && err.message === 'ADMIN_PASSWORD') {
+          return c.json({ error: 'Set an 8+ character password on first HQ sign-in.' }, 400)
+        }
+        throw err
+      }
+    } else if (!verifyPassword(password, user.passwordHash)) {
+      return c.json({ error: 'Email or password is wrong.' }, 401)
+    }
+    await ensureHq(user.id)
+    await setSession(c, user.id)
+    return c.json(await snapshot(user.id))
+  }
+  if (!user || !verifyPassword(password, user.passwordHash)) {
     return c.json({ error: 'Email or password is wrong.' }, 401)
   }
   await setSession(c, user.id, email === DEMO_EMAIL)
