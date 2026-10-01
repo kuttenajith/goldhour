@@ -1,6 +1,8 @@
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
-import { neon } from '@neondatabase/serverless'
+import { neon, neonConfig } from '@neondatabase/serverless'
+
+neonConfig.fetchConnectionCache = true
 import type { Lead, Quotation, StudioProfile } from '../src/lib/types.ts'
 import { seedState } from '../src/lib/seed.ts'
 import { hashPassword, newId } from './crypto.ts'

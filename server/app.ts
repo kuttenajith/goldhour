@@ -83,9 +83,16 @@ async function snapshot(userId: string) {
   }
 }
 
+app.get('/health', (c) => c.json({ ok: true }))
+
+let ready = false
+
 app.use('*', async (c, next) => {
-  await getStore().migrate()
-  await getStore().ensureDemo()
+  if (!ready) {
+    await getStore().migrate()
+    await getStore().ensureDemo()
+    ready = true
+  }
   await next()
 })
 
@@ -93,8 +100,6 @@ app.onError((err, c) => {
   console.error(err)
   return c.json({ error: err.message || 'Server error' }, 500)
 })
-
-app.get('/health', (c) => c.json({ ok: true }))
 
 app.post('/auth/register', async (c) => {
   const body = await readJson<{
