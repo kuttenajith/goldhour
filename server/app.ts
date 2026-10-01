@@ -2,11 +2,11 @@ import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie'
 import { sign, verify } from 'hono/jwt'
-import { DEMO_PIN, seedState } from '../src/lib/seed'
-import type { Lead, Quotation, StudioProfile } from '../src/lib/types'
-import { hashPassword, jwtSecret, newId, razorpaySignature, safeEqual, verifyPassword, webhookSignature } from './crypto'
-import { DEMO_EMAIL, emptyStudio, getStore } from './db'
-import { PLANS, billingStatus, trialEnd, type PaidPlanId } from './plans'
+import { DEMO_PIN, seedState } from '../src/lib/seed.ts'
+import type { Lead, Quotation, StudioProfile } from '../src/lib/types.ts'
+import { hashPassword, jwtSecret, newId, razorpaySignature, safeEqual, verifyPassword, webhookSignature } from './crypto.ts'
+import { DEMO_EMAIL, emptyStudio, getStore } from './db.ts'
+import { PLANS, billingStatus, trialEnd, type PaidPlanId } from './plans.ts'
 
 type Jwt = { sub: string; demo?: boolean }
 
@@ -36,6 +36,7 @@ async function setSession(c: Context, userId: string, demo = false) {
   const token = await sign(
     { sub: userId, demo, exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30 },
     secret,
+    'HS256',
   )
   setCookie(c, 'goldhour_session', token, cookieOpts(c.req.url))
 }
@@ -45,7 +46,7 @@ async function userIdFrom(c: Context) {
   const secret = jwtSecret()
   if (!token || !secret) return null
   try {
-    const payload = (await verify(token, secret)) as Jwt
+    const payload = (await verify(token, secret, 'HS256')) as Jwt
     return payload.sub || null
   } catch {
     return null

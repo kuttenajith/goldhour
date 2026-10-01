@@ -1,9 +1,9 @@
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { neon } from '@neondatabase/serverless'
-import type { Lead, Quotation, StudioProfile } from '../src/lib/types'
-import { seedState } from '../src/lib/seed'
-import { hashPassword, newId } from './crypto'
+import type { Lead, Quotation, StudioProfile } from '../src/lib/types.ts'
+import { seedState } from '../src/lib/seed.ts'
+import { hashPassword, newId } from './crypto.ts'
 
 export type UserRow = {
   id: string
