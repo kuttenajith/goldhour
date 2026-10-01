@@ -284,7 +284,7 @@ function postgresStore(url: string): Store {
           quotations = excluded.quotations`
     },
     async getSub(userId) {
-      const rows = await sql`SELECT user_id AS "userId", plan, status, trial_ends_on AS "trialEndsOn", period_ends_on AS "periodEndsOn", razorpay_payment_id AS "razorpayPaymentId" FROM subscriptions WHERE user_id = ${userId}`
+      const rows = await sql`SELECT user_id AS "userId", plan, status, trial_ends_on::text AS "trialEndsOn", period_ends_on::text AS "periodEndsOn", razorpay_payment_id AS "razorpayPaymentId" FROM subscriptions WHERE user_id = ${userId}`
       const row = rows[0] as SubRow | undefined
       if (!row) return null
       return {
