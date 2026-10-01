@@ -7,7 +7,7 @@
     "dev": "concurrently -k \"npm:dev:api\" \"npm:dev:ui\"",
     "dev:ui": "vite",
     "dev:api": "tsx watch --env-file=.env.local server/dev.ts",
-    "build": "tsc -b && vite build && node scripts/copy-404.mjs",
+    "build": "tsc -b && vite build && node scripts/copy-404.mjs && node scripts/bundle-api.mjs",
     "lint": "oxlint src",
     "preview": "vite preview"
   },
@@ -28,6 +28,7 @@
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "^6.1.0",
     "concurrently": "^9.2.1",
+    "esbuild": "^0.28.2",
     "oxlint": "^1.79.0",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.21.0",

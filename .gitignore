@@ -16,6 +16,7 @@ dist-ssr
 .data
 .neon
 package-lock.json
+api/_bundle.mjs
 
 # Editor directories and files
 .vscode/*
