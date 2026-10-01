@@ -1,11 +1,12 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { StudioShell } from './layout/StudioShell.tsx'
-import { RequireAuth, RequireStudio } from './layout/RequireStudio.tsx'
+import { RequireAdmin, RequireAuth, RequireStudio } from './layout/RequireStudio.tsx'
 import { VisitTracker } from './components/VisitTracker.tsx'
 import { Landing } from './pages/Landing.tsx'
 import { StudioLogin } from './pages/StudioLogin.tsx'
 import { Signup } from './pages/Signup.tsx'
 import { Billing } from './pages/Billing.tsx'
+import { Admin } from './pages/Admin.tsx'
 import { Dashboard } from './pages/Dashboard.tsx'
 import { Leads } from './pages/Leads.tsx'
 import { LeadDetail } from './pages/LeadDetail.tsx'
@@ -33,6 +34,9 @@ export function App() {
         <Route path="/signup" element={<Signup />} />
         <Route element={<RequireAuth />}>
           <Route path="/studio/billing" element={<Billing />} />
+        </Route>
+        <Route element={<RequireAdmin />}>
+          <Route path="/admin" element={<Admin />} />
         </Route>
         <Route element={<RequireStudio />}>
           <Route path="/studio" element={<StudioShell />}>

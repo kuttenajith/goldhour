@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { BrandMark } from '../components/BrandMark.tsx'
 import { Button } from '../components/Button.tsx'
 import { Field, fieldClass } from '../components/Field.tsx'
-import { acceptSession, api } from '../lib/store.ts'
+import { acceptSession, api, homeAfterAuth } from '../lib/store.ts'
 import type { StudioSnapshot } from '../lib/types.ts'
 
 export function Signup() {
@@ -28,7 +28,7 @@ export function Signup() {
         body: JSON.stringify({ email, password, studioName, owner, city, phone }),
       })
       acceptSession(data)
-      navigate('/studio')
+      navigate(homeAfterAuth(data))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not create studio')
     } finally {

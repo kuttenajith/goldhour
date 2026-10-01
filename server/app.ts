@@ -6,6 +6,7 @@ import { DEMO_PIN, seedState } from '../src/lib/seed.ts'
 import type { Lead, Quotation, StudioProfile } from '../src/lib/types.ts'
 import { hashPassword, jwtSecret, newId, razorpaySignature, safeEqual, verifyPassword, webhookSignature } from './crypto.ts'
 import { DEMO_EMAIL, emptyStudio, getStore } from './db.ts'
+import { ADMIN_EMAIL, isAdminEmail, notifyLeadChanges, notifyPaid, notifyStudioSignup } from './notify.ts'
 import { PLANS, billingStatus, trialEnd, type PaidPlanId } from './plans.ts'
 
 type Jwt = { sub: string; demo?: boolean }
@@ -60,8 +61,10 @@ async function snapshot(userId: string) {
   const sub = await db.getSub(userId)
   if (!user || !studio || !sub) return null
   const billing = billingStatus(sub)
+  const admin = isAdminEmail(user.email)
   return {
     email: user.email,
+    isAdmin: admin,
     isDemo: user.email === DEMO_EMAIL,
     onboarded: studio.onboarded,
     studio: {
@@ -74,13 +77,45 @@ async function snapshot(userId: string) {
     leads: studio.leads,
     quotations: studio.quotations,
     billing: {
-      plan: billing.plan,
-      status: billing.status,
+      plan: admin ? 'hq' : billing.plan,
+      status: admin ? 'active' : billing.status,
       trialEndsOn: billing.trialEndsOn,
       periodEndsOn: billing.periodEndsOn,
-      active: billing.active,
+      active: admin || billing.active,
     },
   }
+}
+
+async function claimAdmin(password: string) {
+  if (password.length < 8) {
+    throw new Error('ADMIN_PASSWORD')
+  }
+  const db = getStore()
+  const user = {
+    id: newId(),
+    email: ADMIN_EMAIL,
+    passwordHash: hashPassword(password),
+    createdAt: new Date().toISOString(),
+  }
+  await db.insertUser(user)
+  await db.upsertStudio({
+    ...emptyStudio(user.id, {
+      name: 'GoldHour HQ',
+      owner: 'Ajith',
+      city: 'Madurai',
+      tagline: 'Operator desk',
+    }),
+    onboarded: true,
+  })
+  await db.upsertSub({
+    userId: user.id,
+    plan: 'hq',
+    status: 'active',
+    trialEndsOn: '2099-12-31',
+    periodEndsOn: '2099-12-31',
+    razorpayPaymentId: null,
+  })
+  return user
 }
 
 app.get('/health', (c) => c.json({ ok: true }))
@@ -131,22 +166,46 @@ app.post('/auth/register', async (c) => {
     }
     throw err
   }
+  const admin = isAdminEmail(email)
   await db.upsertStudio(
-    emptyStudio(user.id, {
-      name: studioName,
-      owner: body.owner?.trim() || studioName,
-      city: body.city?.trim() || '',
-      phone: body.phone?.trim() || '',
-    }),
+    admin
+      ? {
+          ...emptyStudio(user.id, {
+            name: 'GoldHour HQ',
+            owner: 'Ajith',
+            city: body.city?.trim() || 'Madurai',
+            phone: body.phone?.trim() || '',
+            tagline: 'Operator desk',
+          }),
+          onboarded: true,
+        }
+      : emptyStudio(user.id, {
+          name: studioName,
+          owner: body.owner?.trim() || studioName,
+          city: body.city?.trim() || '',
+          phone: body.phone?.trim() || '',
+        }),
   )
   await db.upsertSub({
     userId: user.id,
-    plan: 'trial',
-    status: 'trialing',
-    trialEndsOn: trialEnd(),
-    periodEndsOn: null,
+    plan: admin ? 'hq' : 'trial',
+    status: admin ? 'active' : 'trialing',
+    trialEndsOn: admin ? '2099-12-31' : trialEnd(),
+    periodEndsOn: admin ? '2099-12-31' : null,
     razorpayPaymentId: null,
   })
+  if (!admin) {
+    notifyStudioSignup(
+      {
+        name: studioName,
+        owner: body.owner?.trim() || studioName,
+        city: body.city?.trim() || '',
+        phone: body.phone?.trim() || '',
+        tagline: 'Wedding photography',
+      },
+      email,
+    )
+  }
   await setSession(c, user.id)
   return c.json(await snapshot(user.id))
 })
@@ -154,8 +213,19 @@ app.post('/auth/register', async (c) => {
 app.post('/auth/login', async (c) => {
   const body = await readJson<{ email?: string; password?: string }>(c)
   const email = body.email?.trim().toLowerCase() || ''
-  const user = await getStore().findUserByEmail(email)
-  if (!user || !verifyPassword(body.password || '', user.passwordHash)) {
+  const password = body.password || ''
+  const db = getStore()
+  let user = await db.findUserByEmail(email)
+  if (!user && isAdminEmail(email)) {
+    try {
+      user = await claimAdmin(password)
+    } catch (err) {
+      if (err instanceof Error && err.message === 'ADMIN_PASSWORD') {
+        return c.json({ error: 'Set an 8+ character password on first HQ sign-in.' }, 400)
+      }
+      throw err
+    }
+  } else if (!user || !verifyPassword(password, user.passwordHash)) {
     return c.json({ error: 'Email or password is wrong.' }, 401)
   }
   await setSession(c, user.id, email === DEMO_EMAIL)
@@ -197,20 +267,39 @@ app.put('/studio', async (c) => {
     quotations?: Quotation[]
     onboarded?: boolean
   }>(c)
+  const user = await db.findUserById(userId)
+  if (!user) return c.json({ error: 'Studio missing' }, 404)
+  const nextLeads = body.leads ?? current.leads
+  const nextQuotes = body.quotations ?? current.quotations
+  const nextStudio = body.studio
+    ? {
+        name: body.studio.name,
+        owner: body.studio.owner,
+        city: body.studio.city,
+        phone: body.studio.phone,
+        tagline: body.studio.tagline,
+      }
+    : {
+        name: current.name,
+        owner: current.owner,
+        city: current.city,
+        phone: current.phone,
+        tagline: current.tagline,
+      }
   await db.upsertStudio({
     ...current,
-    ...(body.studio
-      ? {
-          name: body.studio.name,
-          owner: body.studio.owner,
-          city: body.studio.city,
-          phone: body.studio.phone,
-          tagline: body.studio.tagline,
-        }
-      : {}),
-    leads: body.leads ?? current.leads,
-    quotations: body.quotations ?? current.quotations,
+    ...nextStudio,
+    leads: nextLeads,
+    quotations: nextQuotes,
     onboarded: body.onboarded ?? current.onboarded,
+  })
+  notifyLeadChanges({
+    email: user.email,
+    studio: nextStudio,
+    before: current.leads || [],
+    after: nextLeads,
+    quotationsBefore: current.quotations || [],
+    quotationsAfter: nextQuotes,
   })
   return c.json(await snapshot(userId))
 })
@@ -246,8 +335,8 @@ app.post('/billing/checkout', async (c) => {
   const user = await getStore().findUserById(userId)
   const studio = await getStore().getStudio(userId)
   if (!user || !studio) return c.json({ error: 'Studio missing' }, 404)
-  if (user.email === DEMO_EMAIL) {
-    return c.json({ error: 'Create your own studio to subscribe. The demo desk stays free.' }, 400)
+  if (user.email === DEMO_EMAIL || isAdminEmail(user.email)) {
+    return c.json({ error: 'HQ and the demo desk stay free. Create a studio account to subscribe.' }, 400)
   }
   const body = await readJson<{ plan?: string }>(c)
   const plan = PLANS[body.plan as PaidPlanId]
@@ -319,6 +408,9 @@ app.post('/billing/confirm', async (c) => {
     return c.json({ error: 'Order not found.' }, 404)
   }
   await getStore().markOrderPaid(orderId, paymentId)
+  const studio = await getStore().getStudio(userId)
+  const user = await getStore().findUserById(userId)
+  if (studio && user) notifyPaid(studio, user.email, order.plan, order.amount)
   return c.json(await snapshot(userId))
 })
 
@@ -338,9 +430,60 @@ app.post('/billing/webhook', async (c) => {
   const orderId = event.payload?.payment?.entity?.order_id
   const paymentId = event.payload?.payment?.entity?.id
   if (event.event === 'payment.captured' && orderId && paymentId) {
+    const order = await getStore().findOrderByRazorpayId(orderId)
     await getStore().markOrderPaid(orderId, paymentId)
+    if (order) {
+      const user = await getStore().findUserById(order.userId)
+      const studio = await getStore().getStudio(order.userId)
+      if (user && studio) notifyPaid(studio, user.email, order.plan, order.amount)
+    }
   }
   return c.json({ ok: true })
+})
+
+app.get('/admin/overview', async (c) => {
+  const userId = await userIdFrom(c)
+  if (!userId) return c.json({ error: 'Sign in required' }, 401)
+  const db = getStore()
+  const me = await db.findUserById(userId)
+  if (!me || !isAdminEmail(me.email)) {
+    return c.json({ error: 'HQ only' }, 403)
+  }
+  const tenants = await db.listTenants()
+  return c.json({
+    isAdmin: true,
+    tenants: tenants.map((row) => {
+      const profile = {
+        name: row.studio?.name || 'Untitled studio',
+        owner: row.studio?.owner || '',
+        city: row.studio?.city || '',
+        phone: row.studio?.phone || '',
+        tagline: row.studio?.tagline || '',
+      }
+      const billing = row.sub
+        ? billingStatus(row.sub)
+        : { plan: 'trial', status: 'expired' as const, trialEndsOn: '', periodEndsOn: null, active: false }
+      const admin = isAdminEmail(row.user.email)
+      const leads = Array.isArray(row.studio?.leads) ? row.studio.leads : []
+      const quotations = Array.isArray(row.studio?.quotations) ? row.studio.quotations : []
+      return {
+        email: row.user.email,
+        createdAt: row.user.createdAt,
+        isDemo: row.user.email === DEMO_EMAIL,
+        isAdmin: admin,
+        studio: profile,
+        leads,
+        quotations,
+        billing: {
+          plan: admin ? 'hq' : billing.plan,
+          status: admin ? 'active' : billing.status,
+          trialEndsOn: billing.trialEndsOn,
+          periodEndsOn: billing.periodEndsOn,
+          active: admin || billing.active,
+        },
+      }
+    }),
+  })
 })
 
 export default app

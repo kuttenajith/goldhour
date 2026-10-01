@@ -4,6 +4,7 @@ import type { Lead, Payment, Quotation, StudioProfile, StudioSnapshot } from './
 
 const EMPTY: StudioSnapshot = {
   email: '',
+  isAdmin: false,
   isDemo: false,
   onboarded: true,
   studio: { name: '', owner: '', city: '', phone: '', tagline: '' },
@@ -38,7 +39,8 @@ function subscribe(fn: () => void) {
 function hydrate(raw: StudioSnapshot): StudioSnapshot {
   return {
     ...raw,
-    leads: raw.leads.map(normalizeLead),
+    isAdmin: Boolean(raw.isAdmin),
+    leads: (raw.leads || []).map(normalizeLead),
   }
 }
 
@@ -114,6 +116,10 @@ export function sessionStatus() {
 
 export function acceptSession(data: StudioSnapshot) {
   apply({ status: 'in', data: hydrate(data) })
+}
+
+export function homeAfterAuth(data: StudioSnapshot) {
+  return data.isAdmin ? '/admin' : '/studio'
 }
 
 export async function logoutStudio() {

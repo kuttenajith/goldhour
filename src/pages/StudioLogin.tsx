@@ -5,7 +5,7 @@ import { BrandMark } from '../components/BrandMark.tsx'
 import { Button } from '../components/Button.tsx'
 import { Field, fieldClass } from '../components/Field.tsx'
 import { SiteVisits } from '../components/SiteVisits.tsx'
-import { acceptSession, api } from '../lib/store.ts'
+import { acceptSession, api, homeAfterAuth } from '../lib/store.ts'
 import type { StudioSnapshot } from '../lib/types.ts'
 import { asset } from '../lib/paths.ts'
 
@@ -27,7 +27,7 @@ export function StudioLogin() {
         body: JSON.stringify({ email, password }),
       })
       acceptSession(data)
-      navigate('/studio')
+      navigate(homeAfterAuth(data))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not sign in')
     } finally {
@@ -45,7 +45,7 @@ export function StudioLogin() {
         body: JSON.stringify({ pin }),
       })
       acceptSession(data)
-      navigate('/studio')
+      navigate(homeAfterAuth(data))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not open demo')
     } finally {

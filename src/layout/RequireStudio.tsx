@@ -23,3 +23,11 @@ export function RequireAuth() {
   if (session.status === 'guest') return <Navigate to="/login" replace />
   return <Outlet />
 }
+
+export function RequireAdmin() {
+  const session = useSession()
+  if (session.status === 'unknown') return <Loading label="Opening HQ…" />
+  if (session.status === 'guest') return <Navigate to="/login" replace />
+  if (!session.data.isAdmin) return <Navigate to="/studio" replace />
+  return <Outlet />
+}

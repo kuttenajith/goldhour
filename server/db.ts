@@ -46,6 +46,12 @@ export type OrderRow = {
   createdAt: string
 }
 
+export type TenantPublic = {
+  user: { id: string; email: string; createdAt: string }
+  studio: StudioRow | null
+  sub: SubRow | null
+}
+
 export type Store = {
   migrate(): Promise<void>
   findUserByEmail(email: string): Promise<UserRow | null>
@@ -59,6 +65,20 @@ export type Store = {
   findOrderByRazorpayId(id: string): Promise<OrderRow | null>
   markOrderPaid(razorpayOrderId: string, paymentId: string): Promise<void>
   ensureDemo(): Promise<UserRow>
+  listTenants(): Promise<TenantPublic[]>
+}
+
+function publicUser(user: UserRow): TenantPublic['user'] {
+  return {
+    id: user.id,
+    email: user.email,
+    createdAt: typeof user.createdAt === 'string' ? user.createdAt : new Date(user.createdAt).toISOString(),
+  }
+}
+
+function sliceDate(value: string | null | undefined) {
+  if (!value) return null
+  return String(value).slice(0, 10)
 }
 
 const DEMO_EMAIL = 'demo@goldhour.app'
@@ -203,6 +223,14 @@ function fileStore(path: string): Store {
     async ensureDemo() {
       return seedDemo(store)
     },
+    async listTenants() {
+      const db = read()
+      return db.users.map((user) => ({
+        user: publicUser(user),
+        studio: db.studios.find((s) => s.userId === user.id) ?? null,
+        sub: db.subs.find((s) => s.userId === user.id) ?? null,
+      }))
+    },
   }
   return store
 }
@@ -331,6 +359,27 @@ function postgresStore(url: string): Store {
     },
     async ensureDemo() {
       return seedDemo(store)
+    },
+    async listTenants() {
+      const users = await sql`SELECT id, email, created_at AS "createdAt" FROM users ORDER BY created_at DESC`
+      const studios = await sql`SELECT id, user_id AS "userId", name, owner, city, phone, tagline, onboarded, leads, quotations FROM studios`
+      const subs = await sql`SELECT user_id AS "userId", plan, status, trial_ends_on::text AS "trialEndsOn", period_ends_on::text AS "periodEndsOn", razorpay_payment_id AS "razorpayPaymentId" FROM subscriptions`
+      const studioByUser = new Map((studios as StudioRow[]).map((s) => [s.userId, s]))
+      const subByUser = new Map(
+        (subs as SubRow[]).map((s) => [
+          s.userId,
+          {
+            ...s,
+            trialEndsOn: sliceDate(s.trialEndsOn) || s.trialEndsOn,
+            periodEndsOn: sliceDate(s.periodEndsOn),
+          },
+        ]),
+      )
+      return (users as { id: string; email: string; createdAt: string }[]).map((user) => ({
+        user: publicUser(user as UserRow),
+        studio: studioByUser.get(user.id) ?? null,
+        sub: subByUser.get(user.id) ?? null,
+      }))
     },
   }
   return store

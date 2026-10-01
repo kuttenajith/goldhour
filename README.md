@@ -7,6 +7,7 @@ Live: [goldhour-chi.vercel.app](https://goldhour-chi.vercel.app)
 - **Start a studio:** `/signup` — 14-day trial, data on the server
 - **Demo:** `/login` → PIN `2026` (Meenakshi Frames, Madurai)
 - **Subscribe:** `/studio/billing` — Razorpay, ₹799 / ₹1,499 a month
+- **HQ:** sign in at `/login` with `ajithkutten1998@gmail.com` → `/admin` (every studio, every wedding). You get email when a photographer signs up, books/updates an event, or pays.
 
 ## What a photographer can do
 

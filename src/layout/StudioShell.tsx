@@ -28,7 +28,7 @@ const links = [
 ]
 
 export function StudioShell() {
-  const { studio, billing } = useStudio()
+  const { studio, billing, isAdmin } = useStudio()
   const navigate = useNavigate()
 
   return (
@@ -46,6 +46,14 @@ export function StudioShell() {
           <p className="mt-3 text-xs uppercase tracking-[0.22em] text-gold-soft">
             {studio.city} studio desk
           </p>
+          {isAdmin ? (
+            <Link
+              to="/admin"
+              className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-gold/15 px-3 py-2.5 text-sm text-gold-soft"
+            >
+              Open HQ · all studios
+            </Link>
+          ) : null}
           <nav className="mt-10 space-y-1">
             {links.map((link) => (
               <NavLink
@@ -92,8 +100,15 @@ export function StudioShell() {
       <div className="min-h-screen pb-2">
         <header className="sticky top-0 z-20 flex items-center justify-between border-b border-line bg-ink/80 px-4 py-3 backdrop-blur lg:hidden">
           <BrandMark />
-          <span className="max-w-[40%] truncate text-xs uppercase tracking-[0.18em] text-gold-soft">
-            {studio.name}
+          <span className="flex items-center gap-3">
+            {isAdmin ? (
+              <Link to="/admin" className="text-xs uppercase tracking-[0.18em] text-gold-soft">
+                HQ
+              </Link>
+            ) : null}
+            <span className="max-w-[40%] truncate text-xs uppercase tracking-[0.18em] text-gold-soft">
+              {studio.name}
+            </span>
           </span>
         </header>
         <nav className="sticky top-[57px] z-20 flex gap-1 overflow-x-auto border-b border-line bg-ink/90 px-3 py-2 lg:hidden">

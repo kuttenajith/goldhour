@@ -102,7 +102,24 @@ export interface Billing {
 
 export interface StudioSnapshot extends StudioState {
   email: string
+  isAdmin?: boolean
   isDemo: boolean
   onboarded: boolean
   billing: Billing
+}
+
+export interface AdminTenant {
+  email: string
+  createdAt: string
+  isDemo: boolean
+  isAdmin: boolean
+  studio: StudioProfile
+  leads: Lead[]
+  quotations: Quotation[]
+  billing: Billing
+}
+
+export interface AdminOverview {
+  isAdmin: true
+  tenants: AdminTenant[]
 }
