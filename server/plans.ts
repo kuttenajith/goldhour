@@ -4,16 +4,16 @@ export const PLANS = {
   studio: {
     id: 'studio' as const,
     name: 'Studio',
-    amountPaise: 79900,
+    amountPaise: 99900,
     days: 30,
-    label: '₹799',
+    label: '₹999',
   },
   studio_pro: {
     id: 'studio_pro' as const,
     name: 'Studio Pro',
-    amountPaise: 149900,
+    amountPaise: 150000,
     days: 30,
-    label: '₹1,499',
+    label: '₹1,500',
   },
 }
 

@@ -15,13 +15,13 @@ const plans = [
   {
     id: 'studio',
     name: 'Studio',
-    price: '₹799',
+    price: '₹999',
     note: 'One photographer or a small team. Unlimited bookings.',
   },
   {
     id: 'studio_pro',
     name: 'Studio Pro',
-    price: '₹1,499',
+    price: '₹1,500',
     note: 'When you need the higher desk. Same workflow, billed as Pro.',
   },
 ]

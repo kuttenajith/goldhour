@@ -64,7 +64,7 @@ export function Signup() {
         <BrandMark />
         <h1 className="mt-10 font-display text-4xl sm:text-5xl">Start your studio desk</h1>
         <p className="mt-3 text-mute">
-          14 days free. Then ₹799 / month. Your leads stay on the server, not in this browser.
+          14 days free. Then ₹999 / month. Your leads stay on the server, not in this browser.
         </p>
         <form onSubmit={submit} className="mt-10 space-y-5" noValidate>
           <Field label="Studio name" error={errors.studioName}>

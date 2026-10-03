@@ -6,7 +6,7 @@ Live: [goldhour-chi.vercel.app](https://goldhour-chi.vercel.app)
 
 - **Start a studio:** `/signup` — 14-day trial, data on the server
 - **Demo:** `/login` → PIN `2026` (Meenakshi Frames, Madurai)
-- **Subscribe:** `/studio/billing` — Razorpay, ₹799 / ₹1,499 a month
+- **Subscribe:** `/studio/billing` - Razorpay, ₹999 / ₹1,500 a month
 - **HQ:** sign in at `/login` with `ajithkutten1998@gmail.com` → `/admin`
 - **Reset password:** `/forgot`
 
