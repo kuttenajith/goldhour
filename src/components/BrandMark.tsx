@@ -1,14 +1,12 @@
-import { asset } from '../lib/paths.ts'
 import { clsx } from '../lib/clsx.ts'
+import { asset } from '../lib/paths.ts'
 
-export function BrandMark({ className }: { className?: string }) {
+export function BrandMark({ className, sweep = false }: { className?: string; sweep?: boolean }) {
   return (
     <span className={clsx('inline-flex items-center gap-2', className)}>
-      <img
-        src={asset('brand/mark.png')}
-        alt=""
-        className="h-8 w-8 rounded-full object-cover ring-1 ring-gold/40"
-      />
+      <span className={clsx('relative h-8 w-8 overflow-hidden rounded-full ring-1 ring-gold/40', sweep && 'brand-sweep')}>
+        <img src={asset('brand/mark.png')} alt="" className="h-full w-full object-cover" />
+      </span>
       <span className="font-display text-2xl leading-none tracking-tight text-cream">GoldHour</span>
     </span>
   )

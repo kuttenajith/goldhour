@@ -5,12 +5,46 @@ import { neon, neonConfig } from '@neondatabase/serverless'
 neonConfig.fetchConnectionCache = true
 import type { Lead, Quotation, StudioProfile } from '../src/lib/types.ts'
 import { seedState } from '../src/lib/seed.ts'
+import { ADMIN_EMAIL, DEMO_EMAIL } from './constants.ts'
 import { hashPassword, newId } from './crypto.ts'
+
+export type UserRole = 'owner' | 'hq'
 
 export type UserRow = {
   id: string
   email: string
   passwordHash: string
+  createdAt: string
+  emailVerifiedAt: string | null
+  role: UserRole
+}
+
+export type SessionRow = {
+  id: string
+  userId: string
+  expiresAt: string
+  revokedAt: string | null
+  createdAt: string
+  ip: string
+  userAgent: string
+}
+
+export type TokenRow = {
+  id: string
+  userId: string
+  kind: 'verify_email' | 'reset_password'
+  tokenHash: string
+  expiresAt: string
+  usedAt: string | null
+}
+
+export type AuditRow = {
+  id: string
+  studioId: string | null
+  userId: string | null
+  action: string
+  detail: string
+  ip: string
   createdAt: string
 }
 
@@ -67,6 +101,31 @@ export type Store = {
   ensureDemo(): Promise<UserRow>
   listTenants(): Promise<TenantPublic[]>
   updatePassword(userId: string, passwordHash: string): Promise<void>
+  markEmailVerified(userId: string): Promise<void>
+  createSession(row: SessionRow): Promise<void>
+  getSession(id: string): Promise<SessionRow | null>
+  revokeSession(id: string): Promise<void>
+  revokeUserSessions(userId: string): Promise<void>
+  recordAuthAttempt(email: string, ip: string, ok: boolean): Promise<void>
+  countRecentFailures(email: string, ip: string, sinceIso: string): Promise<{ email: number; ip: number }>
+  createToken(row: TokenRow): Promise<void>
+  consumeToken(kind: TokenRow['kind'], tokenHash: string): Promise<TokenRow | null>
+  insertAudit(row: AuditRow): Promise<void>
+  listAudit(opts: { studioId?: string; limit?: number }): Promise<AuditRow[]>
+}
+
+function mapUser(row: Partial<UserRow> & { id: string; email: string; passwordHash?: string; password_hash?: string; createdAt?: string; created_at?: string; emailVerifiedAt?: string | null; email_verified_at?: string | null; role?: string }): UserRow {
+  const email = String(row.email).toLowerCase()
+  const createdAt = String(row.createdAt || row.created_at || new Date().toISOString())
+  const verified = row.emailVerifiedAt ?? row.email_verified_at ?? null
+  return {
+    id: row.id,
+    email,
+    passwordHash: row.passwordHash || row.password_hash || '',
+    createdAt,
+    emailVerifiedAt: verified ? String(verified) : null,
+    role: row.role === 'hq' || email === ADMIN_EMAIL ? 'hq' : 'owner',
+  }
 }
 
 function publicUser(user: UserRow): TenantPublic['user'] {
@@ -81,8 +140,6 @@ function sliceDate(value: string | null | undefined) {
   if (!value) return null
   return String(value).slice(0, 10)
 }
-
-const DEMO_EMAIL = 'demo@goldhour.app'
 
 function emptyStudio(userId: string, profile: Partial<StudioProfile> & { name: string }): StudioRow {
   return {
@@ -108,6 +165,8 @@ async function seedDemo(store: Store) {
     email: DEMO_EMAIL,
     passwordHash: hashPassword('2026'),
     createdAt: new Date().toISOString(),
+    emailVerifiedAt: new Date().toISOString(),
+    role: 'owner',
   }
   await store.insertUser(user)
   await store.upsertStudio({
@@ -138,15 +197,28 @@ type FileShape = {
   studios: StudioRow[]
   subs: SubRow[]
   orders: OrderRow[]
+  sessions: SessionRow[]
+  attempts: { email: string; ip: string; ok: boolean; createdAt: string }[]
+  tokens: TokenRow[]
+  audit: AuditRow[]
 }
 
 function fileStore(path: string): Store {
-  const empty = (): FileShape => ({ users: [], studios: [], subs: [], orders: [] })
+  const empty = (): FileShape => ({
+    users: [],
+    studios: [],
+    subs: [],
+    orders: [],
+    sessions: [],
+    attempts: [],
+    tokens: [],
+    audit: [],
+  })
 
   function read(): FileShape {
     if (!existsSync(path)) return empty()
     try {
-      return JSON.parse(readFileSync(path, 'utf8')) as FileShape
+      return { ...empty(), ...(JSON.parse(readFileSync(path, 'utf8')) as Partial<FileShape>) }
     } catch {
       return empty()
     }
@@ -163,10 +235,12 @@ function fileStore(path: string): Store {
     },
     async findUserByEmail(email) {
       const needle = email.trim().toLowerCase()
-      return read().users.find((u) => u.email.toLowerCase() === needle) ?? null
+      const row = read().users.find((u) => u.email.toLowerCase() === needle)
+      return row ? mapUser(row) : null
     },
     async findUserById(id) {
-      return read().users.find((u) => u.id === id) ?? null
+      const row = read().users.find((u) => u.id === id)
+      return row ? mapUser(row) : null
     },
     async insertUser(user) {
       const db = read()
@@ -240,6 +314,72 @@ function fileStore(path: string): Store {
       user.passwordHash = passwordHash
       write(db)
     },
+    async markEmailVerified(userId) {
+      const db = read()
+      const user = db.users.find((u) => u.id === userId)
+      if (!user) return
+      user.emailVerifiedAt = new Date().toISOString()
+      write(db)
+    },
+    async createSession(row) {
+      const db = read()
+      db.sessions.push(row)
+      write(db)
+    },
+    async getSession(id) {
+      return read().sessions.find((s) => s.id === id) ?? null
+    },
+    async revokeSession(id) {
+      const db = read()
+      const row = db.sessions.find((s) => s.id === id)
+      if (!row) return
+      row.revokedAt = new Date().toISOString()
+      write(db)
+    },
+    async revokeUserSessions(userId) {
+      const db = read()
+      const now = new Date().toISOString()
+      db.sessions.forEach((s) => {
+        if (s.userId === userId && !s.revokedAt) s.revokedAt = now
+      })
+      write(db)
+    },
+    async recordAuthAttempt(email, ip, ok) {
+      const db = read()
+      db.attempts.push({ email, ip, ok, createdAt: new Date().toISOString() })
+      db.attempts = db.attempts.slice(-2000)
+      write(db)
+    },
+    async countRecentFailures(email, ip, sinceIso) {
+      const attempts = read().attempts.filter((a) => !a.ok && a.createdAt >= sinceIso)
+      return {
+        email: attempts.filter((a) => a.email === email).length,
+        ip: attempts.filter((a) => a.ip === ip).length,
+      }
+    },
+    async createToken(row) {
+      const db = read()
+      db.tokens.push(row)
+      write(db)
+    },
+    async consumeToken(kind, tokenHash) {
+      const db = read()
+      const row = db.tokens.find((t) => t.kind === kind && t.tokenHash === tokenHash && !t.usedAt)
+      if (!row || row.expiresAt < new Date().toISOString()) return null
+      row.usedAt = new Date().toISOString()
+      write(db)
+      return row
+    },
+    async insertAudit(row) {
+      const db = read()
+      db.audit.unshift(row)
+      db.audit = db.audit.slice(0, 2000)
+      write(db)
+    },
+    async listAudit(opts) {
+      const rows = read().audit.filter((r) => (opts.studioId ? r.studioId === opts.studioId : true))
+      return rows.slice(0, opts.limit ?? 80)
+    },
   }
   return store
 }
@@ -255,6 +395,10 @@ function postgresStore(url: string): Store {
         password_hash text NOT NULL,
         created_at timestamptz NOT NULL DEFAULT now()
       )`
+      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified_at timestamptz`
+      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS role text NOT NULL DEFAULT 'owner'`
+      await sql`UPDATE users SET email_verified_at = COALESCE(email_verified_at, created_at)`
+      await sql`UPDATE users SET role = 'hq' WHERE lower(email) = ${ADMIN_EMAIL}`
       await sql`CREATE TABLE IF NOT EXISTS studios (
         id text PRIMARY KEY,
         user_id text UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -284,26 +428,54 @@ function postgresStore(url: string): Store {
         status text NOT NULL,
         created_at timestamptz NOT NULL DEFAULT now()
       )`
+      await sql`CREATE TABLE IF NOT EXISTS sessions (
+        id text PRIMARY KEY,
+        user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        expires_at timestamptz NOT NULL,
+        revoked_at timestamptz,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        ip text NOT NULL DEFAULT '',
+        user_agent text NOT NULL DEFAULT ''
+      )`
+      await sql`CREATE TABLE IF NOT EXISTS auth_attempts (
+        id text PRIMARY KEY,
+        email text NOT NULL,
+        ip text NOT NULL,
+        ok boolean NOT NULL,
+        created_at timestamptz NOT NULL DEFAULT now()
+      )`
+      await sql`CREATE TABLE IF NOT EXISTS auth_tokens (
+        id text PRIMARY KEY,
+        user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        kind text NOT NULL,
+        token_hash text NOT NULL,
+        expires_at timestamptz NOT NULL,
+        used_at timestamptz
+      )`
+      await sql`CREATE TABLE IF NOT EXISTS audit_events (
+        id text PRIMARY KEY,
+        studio_id text,
+        user_id text,
+        action text NOT NULL,
+        detail text NOT NULL DEFAULT '',
+        ip text NOT NULL DEFAULT '',
+        created_at timestamptz NOT NULL DEFAULT now()
+      )`
     },
     async findUserByEmail(email) {
       const needle = email.trim().toLowerCase()
-      const rows = await sql`SELECT id, email, password_hash AS "passwordHash", created_at AS "createdAt" FROM users WHERE lower(email) = ${needle}`
-      const row = rows[0] as (UserRow & { password_hash?: string }) | undefined
-      if (!row) return null
-      return {
-        id: row.id,
-        email: String(row.email).toLowerCase(),
-        passwordHash: row.passwordHash || row.password_hash || '',
-        createdAt: typeof row.createdAt === 'string' ? row.createdAt : new Date(row.createdAt).toISOString(),
-      }
+      const rows = await sql`SELECT id, email, password_hash AS "passwordHash", created_at AS "createdAt", email_verified_at AS "emailVerifiedAt", role FROM users WHERE lower(email) = ${needle}`
+      const row = rows[0] as Parameters<typeof mapUser>[0] | undefined
+      return row ? mapUser(row) : null
     },
     async findUserById(id) {
-      const rows = await sql`SELECT id, email, password_hash AS "passwordHash", created_at AS "createdAt" FROM users WHERE id = ${id}`
-      return (rows[0] as UserRow) ?? null
+      const rows = await sql`SELECT id, email, password_hash AS "passwordHash", created_at AS "createdAt", email_verified_at AS "emailVerifiedAt", role FROM users WHERE id = ${id}`
+      const row = rows[0] as Parameters<typeof mapUser>[0] | undefined
+      return row ? mapUser(row) : null
     },
     async insertUser(user) {
       try {
-        await sql`INSERT INTO users (id, email, password_hash, created_at) VALUES (${user.id}, ${user.email}, ${user.passwordHash}, ${user.createdAt})`
+        await sql`INSERT INTO users (id, email, password_hash, created_at, email_verified_at, role) VALUES (${user.id}, ${user.email}, ${user.passwordHash}, ${user.createdAt}, ${user.emailVerifiedAt}, ${user.role})`
       } catch (err) {
         const message = err instanceof Error ? err.message : ''
         if (message.includes('unique') || message.includes('duplicate')) throw new Error('EMAIL_TAKEN')
@@ -400,6 +572,63 @@ function postgresStore(url: string): Store {
     },
     async updatePassword(userId, passwordHash) {
       await sql`UPDATE users SET password_hash = ${passwordHash} WHERE id = ${userId}`
+    },
+    async markEmailVerified(userId) {
+      await sql`UPDATE users SET email_verified_at = now() WHERE id = ${userId}`
+    },
+    async createSession(row) {
+      await sql`INSERT INTO sessions (id, user_id, expires_at, revoked_at, created_at, ip, user_agent)
+        VALUES (${row.id}, ${row.userId}, ${row.expiresAt}, ${row.revokedAt}, ${row.createdAt}, ${row.ip}, ${row.userAgent})`
+    },
+    async getSession(id) {
+      const rows = await sql`SELECT id, user_id AS "userId", expires_at AS "expiresAt", revoked_at AS "revokedAt", created_at AS "createdAt", ip, user_agent AS "userAgent" FROM sessions WHERE id = ${id}`
+      const row = rows[0] as SessionRow | undefined
+      if (!row) return null
+      return {
+        ...row,
+        expiresAt: String(row.expiresAt),
+        revokedAt: row.revokedAt ? String(row.revokedAt) : null,
+        createdAt: String(row.createdAt),
+      }
+    },
+    async revokeSession(id) {
+      await sql`UPDATE sessions SET revoked_at = now() WHERE id = ${id} AND revoked_at IS NULL`
+    },
+    async revokeUserSessions(userId) {
+      await sql`UPDATE sessions SET revoked_at = now() WHERE user_id = ${userId} AND revoked_at IS NULL`
+    },
+    async recordAuthAttempt(email, ip, ok) {
+      await sql`INSERT INTO auth_attempts (id, email, ip, ok, created_at) VALUES (${newId()}, ${email}, ${ip}, ${ok}, ${new Date().toISOString()})`
+    },
+    async countRecentFailures(email, ip, sinceIso) {
+      const byEmail = await sql`SELECT count(*)::int AS n FROM auth_attempts WHERE email = ${email} AND ok = false AND created_at >= ${sinceIso}`
+      const byIp = await sql`SELECT count(*)::int AS n FROM auth_attempts WHERE ip = ${ip} AND ok = false AND created_at >= ${sinceIso}`
+      return {
+        email: Number((byEmail[0] as { n?: number })?.n || 0),
+        ip: Number((byIp[0] as { n?: number })?.n || 0),
+      }
+    },
+    async createToken(row) {
+      await sql`INSERT INTO auth_tokens (id, user_id, kind, token_hash, expires_at, used_at)
+        VALUES (${row.id}, ${row.userId}, ${row.kind}, ${row.tokenHash}, ${row.expiresAt}, ${row.usedAt})`
+    },
+    async consumeToken(kind, tokenHash) {
+      const rows = await sql`SELECT id, user_id AS "userId", kind, token_hash AS "tokenHash", expires_at AS "expiresAt", used_at AS "usedAt" FROM auth_tokens WHERE kind = ${kind} AND token_hash = ${tokenHash} AND used_at IS NULL`
+      const row = rows[0] as TokenRow | undefined
+      if (!row) return null
+      if (new Date(String(row.expiresAt)).getTime() < Date.now()) return null
+      await sql`UPDATE auth_tokens SET used_at = now() WHERE id = ${row.id}`
+      return { ...row, expiresAt: String(row.expiresAt), usedAt: new Date().toISOString() }
+    },
+    async insertAudit(row) {
+      await sql`INSERT INTO audit_events (id, studio_id, user_id, action, detail, ip, created_at)
+        VALUES (${row.id}, ${row.studioId}, ${row.userId}, ${row.action}, ${row.detail}, ${row.ip}, ${row.createdAt})`
+    },
+    async listAudit(opts) {
+      const rows = opts.studioId
+        ? await sql`SELECT id, studio_id AS "studioId", user_id AS "userId", action, detail, ip, created_at AS "createdAt" FROM audit_events WHERE studio_id = ${opts.studioId} ORDER BY created_at DESC LIMIT 80`
+        : await sql`SELECT id, studio_id AS "studioId", user_id AS "userId", action, detail, ip, created_at AS "createdAt" FROM audit_events ORDER BY created_at DESC LIMIT 80`
+      return (rows as AuditRow[]).map((r) => ({ ...r, createdAt: String(r.createdAt) }))
     },
   }
   return store

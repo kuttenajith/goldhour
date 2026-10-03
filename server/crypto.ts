@@ -1,4 +1,4 @@
-import { randomBytes, scryptSync, timingSafeEqual, createHmac } from 'node:crypto'
+import { randomBytes, scryptSync, timingSafeEqual, createHmac, createHash } from 'node:crypto'
 
 export function newId() {
   return crypto.randomUUID()
@@ -36,4 +36,16 @@ export function safeEqual(a: string, b: string) {
   const right = Buffer.from(b)
   if (left.length !== right.length) return false
   return timingSafeEqual(left, right)
+}
+
+export function randomToken() {
+  return randomBytes(32).toString('hex')
+}
+
+export function hashToken(token: string) {
+  return createHash('sha256').update(token).digest('hex')
+}
+
+export function errorId() {
+  return `GH-${randomBytes(3).toString('hex').toUpperCase()}`
 }

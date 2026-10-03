@@ -7,14 +7,18 @@ Live: [goldhour-chi.vercel.app](https://goldhour-chi.vercel.app)
 - **Start a studio:** `/signup` — 14-day trial, data on the server
 - **Demo:** `/login` → PIN `2026` (Meenakshi Frames, Madurai)
 - **Subscribe:** `/studio/billing` — Razorpay, ₹799 / ₹1,499 a month
-- **HQ:** sign in at `/login` with `ajithkutten1998@gmail.com` → `/admin` (every studio, every wedding). You get email when a photographer signs up, books/updates an event, or pays.
+- **HQ:** sign in at `/login` with `ajithkutten1998@gmail.com` → `/admin`
+- **Reset password:** `/forgot`
+
+Security notes: [SECURITY.md](./SECURITY.md)
 
 ## What a photographer can do
 
 1. Sign up and keep leads on their own account
 2. Enquiry → personalised quote PDF → WhatsApp follow-up → booked
 3. Track advance / before wedding / final delivery
-4. Pay GoldHour with Razorpay after the trial
+4. Calendar + activity log on the desk
+5. Pay GoldHour with Razorpay after the trial
 
 ## Run locally
 
@@ -36,6 +40,8 @@ UI: http://localhost:5173 · API: http://localhost:8788
 | `RAZORPAY_KEY_ID` | Checkout |
 | `RAZORPAY_KEY_SECRET` | Orders + signature |
 | `RAZORPAY_WEBHOOK_SECRET` | `https://goldhour-chi.vercel.app/api/billing/webhook` |
+| `RESEND_API_KEY` | Studio password-reset and confirm emails |
+| `MAIL_FROM` | Verified Resend from-address |
 
 ## License
 

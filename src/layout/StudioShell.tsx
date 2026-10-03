@@ -8,9 +8,11 @@ import {
   IndianRupee,
   LayoutDashboard,
   LogOut,
+  ScrollText,
   Users,
 } from 'lucide-react'
 import { BrandMark } from '../components/BrandMark.tsx'
+import { ThemeToggle } from '../components/ThemeToggle.tsx'
 import { Onboarding } from '../components/Onboarding.tsx'
 import { SiteVisits } from '../components/SiteVisits.tsx'
 import { logoutStudio, useStudio } from '../lib/store.ts'
@@ -21,9 +23,11 @@ const links = [
   { to: '/studio', label: 'Desk', icon: LayoutDashboard, end: true },
   { to: '/studio/leads', label: 'Leads', icon: Users },
   { to: '/studio/bookings', label: 'Bookings', icon: CalendarDays },
+  { to: '/studio/calendar', label: 'Calendar', icon: CalendarDays },
   { to: '/studio/follow-ups', label: 'Follow-ups', icon: Bell },
   { to: '/studio/quotations', label: 'Quotations', icon: FileText },
   { to: '/studio/payments', label: 'Payments', icon: IndianRupee },
+  { to: '/studio/activity', label: 'Activity', icon: ScrollText },
   { to: '/studio/billing', label: 'Plan', icon: CreditCard },
 ]
 
@@ -42,7 +46,7 @@ export function StudioShell() {
         />
         <div className="absolute inset-0 bg-gradient-to-b from-ink via-ink/85 to-ink" />
         <div className="relative flex h-full flex-col p-6">
-          <BrandMark />
+          <BrandMark sweep />
           <p className="mt-3 text-xs uppercase tracking-[0.22em] text-gold-soft">
             {studio.city} studio desk
           </p>
@@ -84,6 +88,9 @@ export function StudioShell() {
             <p className="mt-3 text-xs text-gold-soft">
               <SiteVisits />
             </p>
+            <div className="mt-3">
+              <ThemeToggle />
+            </div>
             <button
               className="mt-4 inline-flex items-center gap-2 text-sm text-mute hover:text-cream"
               onClick={() => {
@@ -128,7 +135,7 @@ export function StudioShell() {
             </NavLink>
           ))}
         </nav>
-        <main className="px-4 py-6 sm:px-8 sm:py-8">
+        <main className="page-rise px-4 py-6 sm:px-8 sm:py-8">
           {billing.status === 'trialing' ? (
             <Link
               to="/studio/billing"

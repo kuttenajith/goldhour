@@ -1,14 +1,10 @@
 import type { Lead, Quotation, StudioProfile } from '../src/lib/types.ts'
 import { day, money, PAYMENT_LABEL, SERVICE_LABEL, SOURCE_LABEL, STATUS_LABEL } from '../src/lib/format.ts'
-import { DEMO_EMAIL } from './db.ts'
+import { ADMIN_EMAIL, DEMO_EMAIL, isAdminEmail } from './constants.ts'
 
-export const ADMIN_EMAIL = 'ajithkutten1998@gmail.com'
+export { ADMIN_EMAIL, isAdminEmail }
 
 const WEB3FORMS_KEY = process.env.WEB3FORMS_ACCESS_KEY || 'e7e8e974-642c-411f-83ae-999cdbcdbb6e'
-
-export function isAdminEmail(email: string) {
-  return email.trim().toLowerCase() === ADMIN_EMAIL
-}
 
 function leadFingerprint(lead: Lead) {
   return JSON.stringify({

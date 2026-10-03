@@ -7,6 +7,9 @@ import { StudioLogin } from './pages/StudioLogin.tsx'
 import { Signup } from './pages/Signup.tsx'
 import { Billing } from './pages/Billing.tsx'
 import { Admin } from './pages/Admin.tsx'
+import { Activity } from './pages/Activity.tsx'
+import { Calendar } from './pages/Calendar.tsx'
+import { Forgot, Reset } from './pages/Forgot.tsx'
 import { Dashboard } from './pages/Dashboard.tsx'
 import { Leads } from './pages/Leads.tsx'
 import { LeadDetail } from './pages/LeadDetail.tsx'
@@ -32,6 +35,8 @@ export function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<StudioLogin />} />
         <Route path="/signup" element={<Signup />} />
+        <Route path="/forgot" element={<Forgot />} />
+        <Route path="/reset" element={<Reset />} />
         <Route element={<RequireAuth />}>
           <Route path="/studio/billing" element={<Billing />} />
         </Route>
@@ -44,9 +49,11 @@ export function App() {
             <Route path="leads" element={<Leads />} />
             <Route path="leads/:id" element={<LeadDetail />} />
             <Route path="bookings" element={<Bookings />} />
+            <Route path="calendar" element={<Calendar />} />
             <Route path="follow-ups" element={<FollowUps />} />
             <Route path="quotations" element={<Quotations />} />
             <Route path="payments" element={<Payments />} />
+            <Route path="activity" element={<Activity />} />
           </Route>
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

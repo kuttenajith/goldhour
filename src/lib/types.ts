@@ -103,6 +103,9 @@ export interface Billing {
 export interface StudioSnapshot extends StudioState {
   email: string
   isAdmin?: boolean
+  role?: 'owner' | 'hq'
+  emailVerified?: boolean
+  studioId?: string
   isDemo: boolean
   onboarded: boolean
   billing: Billing

@@ -20,6 +20,8 @@ if (!user) {
     email: ADMIN_EMAIL,
     passwordHash: hash,
     createdAt: new Date().toISOString(),
+    emailVerifiedAt: new Date().toISOString(),
+    role: 'hq',
   }
   await db.insertUser(user)
   console.log('created HQ user')

@@ -3,9 +3,11 @@ import { ArrowUpRight } from 'lucide-react'
 import { StatusPill } from '../components/StatusPill.tsx'
 import { Button } from '../components/Button.tsx'
 import { paidOf } from '../lib/booking.ts'
+import { dayPlan } from '../lib/dayPlan.ts'
 import { day, money, paid, todayIso } from '../lib/format.ts'
 import { useStudio } from '../lib/store.ts'
 import { asset } from '../lib/paths.ts'
+import { clsx } from '../lib/clsx.ts'
 
 export function Dashboard() {
   const { studio, leads } = useStudio()
@@ -20,13 +22,14 @@ export function Dashboard() {
     .filter((l) => l.status === 'booked' || l.status === 'accepted')
     .reduce((s, l) => s + Math.max(0, l.packageAmount - paid(l)), 0)
   const priya = leads.find((l) => l.coupleName.startsWith('Priya'))
+  const plan = dayPlan(leads)
 
   return (
-    <div className="space-y-8">
+    <div className="page-rise space-y-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-xs uppercase tracking-[0.28em] text-gold-soft">{studio.name}</p>
-          <h1 className="mt-2 font-display text-4xl sm:text-5xl">Run one wedding.</h1>
+          <h1 className="mt-2 font-display text-4xl sm:text-5xl">Your day.</h1>
           <p className="mt-2 text-mute">
             {enquiries.length} new · {booked.length} booked · {studio.city}
           </p>
@@ -54,6 +57,25 @@ export function Dashboard() {
           </article>
         ))}
       </div>
+
+      <article className="rounded-3xl border border-line bg-ink-2 p-5 sm:p-6">
+        <p className="text-xs uppercase tracking-[0.22em] text-mute">Next actions</p>
+        <ul className="mt-4 space-y-3">
+          {plan.map((item) => (
+            <li key={item.label}>
+              <Link
+                to={item.href}
+                className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-ink px-4 py-3 hover:border-gold/40"
+              >
+                <span className={clsx(item.tone === 'red' && 'text-orange-200', item.tone === 'amber' && 'text-amber-200', item.tone === 'gold' && 'text-gold-soft', item.tone === 'mute' && 'text-mute')}>
+                  {item.label}
+                </span>
+                <ArrowUpRight size={16} className="text-gold-soft" />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </article>
 
       <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
         <article className="rounded-3xl border border-line bg-ink-2 p-5 sm:p-6">
@@ -111,7 +133,7 @@ export function Dashboard() {
             <Link
               key={l.id}
               to={`/studio/leads/${l.id}`}
-              className="rounded-2xl border border-line bg-ink p-4 transition hover:border-gold/50"
+              className="card-lift rounded-2xl border border-line bg-ink p-4 transition hover:border-gold/50"
             >
               <p className="font-display text-2xl">{l.coupleName}</p>
               <p className="mt-1 text-sm text-mute">

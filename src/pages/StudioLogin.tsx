@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { BrandMark } from '../components/BrandMark.tsx'
 import { Button } from '../components/Button.tsx'
 import { Field, fieldClass } from '../components/Field.tsx'
@@ -11,6 +11,8 @@ import { asset } from '../lib/paths.ts'
 
 export function StudioLogin() {
   const navigate = useNavigate()
+  const [params] = useSearchParams()
+  const verify = params.get('verify')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [pin, setPin] = useState('')
@@ -67,8 +69,10 @@ export function StudioLogin() {
         </p>
       </div>
       <div className="flex flex-col justify-center bg-ink px-6 py-16 sm:px-16">
-        <BrandMark />
+        <BrandMark sweep />
         <h1 className="mt-10 font-display text-5xl">Studio sign in</h1>
+        {verify === 'ok' ? <p className="mt-3 text-sm text-gold-soft">Email confirmed. Sign in.</p> : null}
+        {verify === 'expired' ? <p className="mt-3 text-sm text-orange-200">That confirmation link expired.</p> : null}
         <p className="mt-3 max-w-md text-mute">
           Sign in to your desk, or open the Madurai demo with PIN{' '}
           <span className="text-gold-soft">2026</span>.
@@ -99,6 +103,10 @@ export function StudioLogin() {
           </Button>
         </form>
         <p className="mt-4 max-w-sm text-sm text-mute">
+          <Link to="/forgot" className="text-gold-soft">
+            Forgot password
+          </Link>
+          {' · '}
           New studio?{' '}
           <Link to="/signup" className="text-gold-soft">
             Start a 14-day trial
