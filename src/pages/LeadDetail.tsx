@@ -61,13 +61,13 @@ export function LeadDetail() {
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <Link to="/studio/leads" className="text-xs uppercase tracking-[0.22em] text-gold-soft">
+          <Link to="/studio/leads" className="text-[11px] uppercase tracking-[0.18em] text-gold-soft">
             ← Leads
           </Link>
-          <h1 className="mt-3 font-display text-3xl leading-tight sm:text-5xl">{lead.coupleName}</h1>
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-mute sm:text-base">
+          <h1 className="mt-2 font-display text-2xl leading-tight sm:text-3xl">{lead.coupleName}</h1>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-mute">
             <StatusPill status={lead.status} />
             <span>
               {lead.venue || lead.city} · {lead.phone}
@@ -81,7 +81,7 @@ export function LeadDetail() {
 
       <Pipeline status={lead.status} />
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
         <Fact label="Wedding" value={day(lead.eventDate)} />
         <Fact label="Package" value={money(lead.packageAmount || lead.budget)} />
         <Fact label="Advance" value={`${money(paidOf(lead, 'advance'))}${paidOf(lead, 'advance') >= lead.plan.advance && lead.plan.advance > 0 ? ' ✓' : ''}`} />
@@ -290,9 +290,9 @@ export function LeadDetail() {
 
 function Fact({ label, value }: { label: string; value: string }) {
   return (
-    <article className="rounded-3xl border border-line bg-ink-2 p-4 sm:p-5">
-      <p className="text-sm font-semibold uppercase tracking-[0.08em] text-mute">{label}</p>
-      <p className="mt-2 font-display text-2xl tabular-nums text-gold-soft sm:text-3xl">{value}</p>
+    <article className="rounded-xl border border-line bg-ink-2 px-3 py-3 sm:px-4">
+      <p className="text-[11px] uppercase tracking-[0.14em] text-mute">{label}</p>
+      <p className="mt-1 text-sm font-medium tabular-nums text-gold-soft sm:text-base">{value}</p>
     </article>
   )
 }

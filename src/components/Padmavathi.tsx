@@ -19,7 +19,7 @@ export function Padmavathi() {
   const stale = useSyncExternalStore(subscribeTab, isTabStale, () => false)
   const authed = session.status === 'in'
   const snap = authed ? session.data : null
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(false)
   const [ask, setAsk] = useState('')
   const [hq, setHq] = useState<AdminOverview | null>(null)
   const [lines, setLines] = useState<Line[]>([])
@@ -28,11 +28,11 @@ export function Padmavathi() {
     if (!authed || !snap) {
       setLines([])
       setHq(null)
-      setOpen(true)
+      setOpen(false)
       return
     }
     setLines([{ role: 'desk', text: greeting(snap) }])
-    setOpen(true)
+    setOpen(false)
   }, [authed, snap?.email, snap?.studio.owner])
 
   useEffect(() => {
@@ -41,6 +41,15 @@ export function Padmavathi() {
       .then(setHq)
       .catch(() => setHq(null))
   }, [authed, snap?.isAdmin])
+
+  useEffect(() => {
+    if (!open) return
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [open])
 
   if (!authed || !snap || stale) return null
 
@@ -62,72 +71,86 @@ export function Padmavathi() {
   }
 
   return (
-    <div className="pointer-events-none fixed bottom-4 right-3 z-[60] sm:bottom-6 sm:right-6">
+    <>
       {open ? (
-        <div className="pointer-events-auto mb-3 flex h-[min(440px,72dvh)] w-[min(100vw-1.5rem,380px)] flex-col overflow-hidden rounded-3xl border border-line bg-ink-2 shadow-[0_24px_80px_rgba(0,0,0,0.45)]">
-          <div className="flex items-center justify-between border-b border-line px-4 py-3">
-            <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-gold-soft">Padmavathi</p>
-              <p className="text-[11px] text-mute">{onHq ? 'HQ assistant' : 'Studio desk'}</p>
-            </div>
-            <button type="button" className="text-mute hover:text-cream" onClick={() => setOpen(false)} aria-label="Close Padmavathi">
-              <X size={16} />
-            </button>
-          </div>
-          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3 text-sm">
-            {lines.map((line, i) => (
-              <div key={i} className={clsx('whitespace-pre-wrap', line.role === 'you' ? 'text-cream' : 'text-gold-soft')}>
-                <p>{line.text}</p>
-                {line.links?.length ? (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {line.links.map((link) => (
-                      <Link
-                        key={link.href}
-                        to={link.href}
-                        className="rounded-full border border-gold/35 px-3 py-1 text-xs text-gold-soft"
-                      >
-                        {link.label}
-                      </Link>
-                    ))}
-                  </div>
-                ) : null}
+        <div className="fixed inset-0 z-[60]">
+          <button
+            type="button"
+            className="absolute inset-0 bg-ink/55 backdrop-blur-[2px]"
+            aria-label="Close Padmavathi"
+            onClick={() => setOpen(false)}
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Padmavathi"
+            className="absolute bottom-[4.75rem] right-3 flex h-[min(420px,68dvh)] w-[min(100vw-1.5rem,360px)] flex-col overflow-hidden rounded-2xl border border-line bg-ink-2 shadow-[0_24px_80px_rgba(0,0,0,0.5)] sm:right-6"
+          >
+            <div className="flex items-center justify-between border-b border-line px-4 py-3">
+              <div>
+                <p className="text-xs uppercase tracking-[0.2em] text-gold-soft">Padmavathi</p>
+                <p className="text-[11px] text-mute">{onHq ? 'HQ assistant' : 'Studio desk'}</p>
               </div>
-            ))}
-          </div>
-          <div className="flex flex-wrap gap-1 border-t border-line px-3 py-2">
-            {chips.map((chip) => (
-              <button
-                key={chip}
-                type="button"
-                className="rounded-full border border-line px-2.5 py-1 text-[11px] text-mute hover:text-cream"
-                onClick={() => send(chip)}
-              >
-                {chip}
+              <button type="button" className="text-mute hover:text-cream" onClick={() => setOpen(false)} aria-label="Close Padmavathi">
+                <X size={16} />
               </button>
-            ))}
+            </div>
+            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3 text-sm">
+              {lines.map((line, i) => (
+                <div key={i} className={clsx('whitespace-pre-wrap', line.role === 'you' ? 'text-cream' : 'text-gold-soft')}>
+                  <p>{line.text}</p>
+                  {line.links?.length ? (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {line.links.map((link) => (
+                        <Link
+                          key={link.href}
+                          to={link.href}
+                          onClick={() => setOpen(false)}
+                          className="rounded-full border border-gold/35 px-3 py-1 text-xs text-gold-soft"
+                        >
+                          {link.label}
+                        </Link>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-1 border-t border-line px-3 py-2">
+              {chips.map((chip) => (
+                <button
+                  key={chip}
+                  type="button"
+                  className="rounded-full border border-line px-2.5 py-1 text-[11px] text-mute hover:text-cream"
+                  onClick={() => send(chip)}
+                >
+                  {chip}
+                </button>
+              ))}
+            </div>
+            <form onSubmit={submit} className="flex gap-2 border-t border-line p-3">
+              <input
+                className="min-w-0 flex-1 rounded-xl border border-line bg-ink px-3 py-2 text-sm outline-none focus:border-gold/60"
+                value={ask}
+                onChange={(e) => setAsk(e.target.value)}
+                placeholder="Ask Padmavathi…"
+              />
+              <button type="submit" className="shrink-0 rounded-full bg-gold px-4 py-2 text-sm text-ink">
+                Ask
+              </button>
+            </form>
           </div>
-          <form onSubmit={submit} className="flex gap-2 border-t border-line p-3">
-            <input
-              className="min-w-0 flex-1 rounded-xl border border-line bg-ink px-3 py-2 text-sm outline-none focus:border-gold/60"
-              value={ask}
-              onChange={(e) => setAsk(e.target.value)}
-              placeholder="Ask Padmavathi…"
-            />
-            <button type="submit" className="shrink-0 rounded-full bg-gold px-4 py-2 text-sm text-ink">
-              Ask
-            </button>
-          </form>
         </div>
       ) : null}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="pointer-events-auto inline-flex min-h-12 items-center gap-2 rounded-full bg-gold px-4 text-sm font-medium text-ink shadow-lg hover:bg-gold-soft"
-        aria-label="Open Padmavathi"
+        className="fixed bottom-4 right-3 z-[70] inline-flex min-h-11 items-center gap-2 rounded-full bg-gold px-3.5 text-sm font-medium text-ink shadow-lg hover:bg-gold-soft sm:bottom-6 sm:right-6"
+        aria-label={open ? 'Close Padmavathi' : 'Open Padmavathi'}
       >
-        <MessageCircle size={18} />
+        {open ? <X size={16} /> : <MessageCircle size={16} />}
         Padmavathi
       </button>
-    </div>
+    </>
   )
 }

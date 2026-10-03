@@ -4,7 +4,6 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { BrandMark } from '../components/BrandMark.tsx'
 import { Button } from '../components/Button.tsx'
 import { Field, fieldBox } from '../components/Field.tsx'
-import { SiteVisits } from '../components/SiteVisits.tsx'
 import { acceptSession, api, homeAfterAuth } from '../lib/store.ts'
 import { emailError, onlyPhone } from '../lib/input.ts'
 import type { StudioSnapshot } from '../lib/types.ts'
@@ -136,9 +135,6 @@ export function StudioLogin() {
             Open demo desk
           </Button>
         </form>
-        <p className="mt-10 text-xs text-mute">
-          <SiteVisits />
-        </p>
       </div>
     </div>
   )

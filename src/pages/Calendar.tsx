@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { PageHeader } from '../components/PageHeader.tsx'
 import { day, money } from '../lib/format.ts'
 import { useStudio } from '../lib/store.ts'
 import { clsx } from '../lib/clsx.ts'
@@ -47,20 +48,20 @@ export function Calendar() {
 
   return (
     <div className="page-rise space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-xs uppercase tracking-[0.28em] text-gold-soft">Calendar</p>
-          <h1 className="mt-2 font-display text-3xl sm:text-4xl">{label}</h1>
-        </div>
-        <div className="flex gap-2">
-          <button type="button" className="rounded-full border border-line px-3 py-1.5 text-sm text-mute" onClick={() => setCursor((c) => ({ y: c.m === 0 ? c.y - 1 : c.y, m: c.m === 0 ? 11 : c.m - 1 }))}>
-            Prev
-          </button>
-          <button type="button" className="rounded-full border border-line px-3 py-1.5 text-sm text-mute" onClick={() => setCursor((c) => ({ y: c.m === 11 ? c.y + 1 : c.y, m: c.m === 11 ? 0 : c.m + 1 }))}>
-            Next
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        kicker="Calendar"
+        title={label}
+        actions={
+          <div className="flex gap-2">
+            <button type="button" className="rounded-full border border-line px-3 py-1.5 text-sm text-mute" onClick={() => setCursor((c) => ({ y: c.m === 0 ? c.y - 1 : c.y, m: c.m === 0 ? 11 : c.m - 1 }))}>
+              Prev
+            </button>
+            <button type="button" className="rounded-full border border-line px-3 py-1.5 text-sm text-mute" onClick={() => setCursor((c) => ({ y: c.m === 11 ? c.y + 1 : c.y, m: c.m === 11 ? 0 : c.m + 1 }))}>
+              Next
+            </button>
+          </div>
+        }
+      />
       <div className="min-w-0 overflow-x-auto">
         <div className="min-w-[560px]">
           <div className="grid grid-cols-7 gap-1 text-center text-[11px] uppercase tracking-wider text-mute">

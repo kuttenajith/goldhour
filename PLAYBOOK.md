@@ -61,7 +61,7 @@ Write down every hop: WhatsApp → notes → calendar → Excel → PDF → UPI 
 
 Build nothing they did not touch.
 
-Then ask: would you pay ₹799/month for this? Checkout is in the desk (Razorpay). Add `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` on Vercel when you are ready to take money.
+Then ask: would you pay ₹999/month for this? Checkout is in the desk (Razorpay). Add `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` on Vercel when you are ready to take money.
 
 ## Do not build yet
 

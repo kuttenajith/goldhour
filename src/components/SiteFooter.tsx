@@ -1,6 +1,5 @@
 import { Link } from 'react-router-dom'
 import { BrandMark } from './BrandMark.tsx'
-import { SiteVisits } from './SiteVisits.tsx'
 
 export function SiteFooter() {
   return (
@@ -10,9 +9,6 @@ export function SiteFooter() {
           <BrandMark />
           <p className="mt-4 max-w-xs text-mute">
             The studio desk for India’s wedding photographers — leads, quotations, advances and WhatsApp follow-ups.
-          </p>
-          <p className="mt-4">
-            <SiteVisits />
           </p>
         </div>
         <div>

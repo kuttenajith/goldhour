@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { LogOut, Shield } from 'lucide-react'
 import { BrandMark } from '../components/BrandMark.tsx'
+import { SiteVisits } from '../components/SiteVisits.tsx'
 import { StatusPill } from '../components/StatusPill.tsx'
 import { fieldClass } from '../components/Field.tsx'
 import { day, money, paid, PAYMENT_LABEL } from '../lib/format.ts'
@@ -170,25 +171,32 @@ export function Admin() {
 
       <main className="mx-auto max-w-5xl space-y-8 px-4 py-8 sm:px-8">
         <div>
-          <p className="text-xs uppercase tracking-[0.28em] text-gold-soft">Operator</p>
-          <h1 className="mt-2 font-display text-4xl sm:text-5xl">Every studio. Every wedding.</h1>
-          <p className="mt-2 max-w-2xl text-mute">
-            Paying and trial desks, the couples they booked, and a mail to you whenever a photographer saves a marriage or event.
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gold-soft">HQ</p>
+          <h1 className="mt-1 font-display text-2xl sm:text-3xl">Every studio</h1>
+          <p className="mt-1 max-w-2xl text-sm text-mute">
+            Paying and trial desks, the couples they booked, and site traffic only you can see.
           </p>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           {[
             ['Studios', String(live.length)],
             ['Paying', String(paying.length)],
             ['On trial', String(trial.length)],
             ['Events on file', String(events)],
           ].map(([k, v]) => (
-            <article key={k} className="rounded-3xl border border-line bg-ink-2 p-5">
-              <p className="text-xs uppercase tracking-[0.2em] text-mute">{k}</p>
-              <p className="mt-3 font-display text-3xl tabular-nums text-gold-soft">{v}</p>
+            <article key={k} className="rounded-2xl border border-line bg-ink-2 p-4">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-mute">{k}</p>
+              <p className="mt-2 font-display text-2xl tabular-nums text-gold-soft sm:text-3xl">{v}</p>
             </article>
           ))}
+          <article className="rounded-2xl border border-line bg-ink-2 p-4">
+            <p className="text-[11px] uppercase tracking-[0.18em] text-mute">Site visits</p>
+            <p className="mt-2 font-display text-2xl tabular-nums text-gold-soft sm:text-3xl">
+              <SiteVisits variant="stat" />
+            </p>
+            <p className="mt-1 text-[11px] text-mute">Unique browsers · HQ only</p>
+          </article>
         </div>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">

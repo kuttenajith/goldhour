@@ -91,7 +91,7 @@ export function loadVisits() {
   return visitsPromise
 }
 
-export function SiteVisits() {
+export function SiteVisits({ variant = 'pill' }: { variant?: 'pill' | 'stat' }) {
   const [visits, setVisits] = useState<number | null>(null)
 
   useEffect(() => {
@@ -105,6 +105,14 @@ export function SiteVisits() {
   }, [])
 
   const formatted = visits == null ? '…' : new Intl.NumberFormat('en').format(visits)
+
+  if (variant === 'stat') {
+    return (
+      <span className="tabular-nums" title="Unique browsers, excluding yours">
+        {formatted}
+      </span>
+    )
+  }
 
   return (
     <span className="foot-visits" title="Unique browsers, excluding yours">

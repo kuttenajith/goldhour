@@ -35,8 +35,8 @@ export function Activity() {
   return (
     <div className="page-rise space-y-6">
       <div>
-        <p className="text-xs uppercase tracking-[0.28em] text-gold-soft">Activity</p>
-        <h1 className="mt-2 font-display text-4xl">What happened on this desk</h1>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gold-soft">Activity</p>
+        <h1 className="mt-1 font-display text-2xl sm:text-3xl">Desk activity</h1>
       </div>
       {error ? <p className="text-sm text-orange-200">{error}</p> : null}
       <ul className="divide-y divide-line rounded-3xl border border-line bg-ink-2">

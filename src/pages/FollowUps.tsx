@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { addDays, day, todayIso } from '../lib/format.ts'
 import { setNextAction, useStudio } from '../lib/store.ts'
 import { Button } from '../components/Button.tsx'
+import { PageHeader } from '../components/PageHeader.tsx'
 import { StatusPill } from '../components/StatusPill.tsx'
 import type { Lead } from '../lib/types.ts'
 
@@ -17,16 +18,14 @@ export function FollowUps() {
   const silent = active.filter((l) => l.status === 'no_response' && l.nextActionOn > today)
 
   return (
-    <div className="space-y-8">
-      <div>
-        <p className="text-xs uppercase tracking-[0.28em] text-gold-soft">Rhythm</p>
-        <h1 className="mt-2 font-display text-4xl sm:text-5xl">Follow-ups</h1>
-        <p className="mt-2 max-w-xl text-sm text-mute">
-          Quotation sent → follow up in 2 days → no response → follow up in 5 days.
-        </p>
-      </div>
-      <Group title="Due now" items={due} snoozeLabel="Snooze 2d" snoozeDays={2} />
-      <Group title="Quotation sent · follow up in 2 days" items={inTwo} snoozeLabel="No response · 5d" snoozeDays={5} silent />
+    <div className="space-y-5">
+      <PageHeader
+        kicker="Tasks"
+        title="Follow-ups"
+        hint="Quote sent → follow up in 2 days → no response → follow up in 5."
+      />
+      <Group title={`Due now · ${due.length}`} items={due} snoozeLabel="Snooze 2d" snoozeDays={2} />
+      <Group title="Quoted · follow up in 2 days" items={inTwo} snoozeLabel="No response · 5d" snoozeDays={5} silent />
       <Group title="No response · follow up in 5 days" items={silent} snoozeLabel="Snooze 5d" snoozeDays={5} />
     </div>
   )
@@ -46,8 +45,8 @@ function Group({
   silent?: boolean
 }) {
   return (
-    <section className="rounded-3xl border border-line bg-ink-2 p-5 sm:p-6">
-      <h2 className="font-display text-2xl sm:text-3xl">{title}</h2>
+    <section className="rounded-2xl border border-line bg-ink-2 p-4 sm:p-5">
+      <h2 className="text-sm font-semibold text-cream">{title}</h2>
       {items.length === 0 ? (
         <p className="mt-4 text-sm text-mute">Clear. Nothing in this tray.</p>
       ) : (
