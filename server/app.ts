@@ -28,7 +28,16 @@ import {
 } from './crypto.ts'
 import { emptyStudio, getStore, type UserRow } from './db.ts'
 import { mailUser } from './mail.ts'
-import { notifyLeadChanges, notifyPaid, notifyStudioSignup } from './notify.ts'
+import {
+  notifyCheckout,
+  notifyDemoOpened,
+  notifyLeadChanges,
+  notifyLogin,
+  notifyPaid,
+  notifySimple,
+  notifyStudioSignup,
+  notifyTrialWelcome,
+} from './notify.ts'
 import { PLANS, billingStatus, trialEnd, type PaidPlanId } from './plans.ts'
 import { emailOk, passwordOk, studioPayloadTooLarge, validateLeads, validateQuotations, validateStudioProfile } from './validate.ts'
 
@@ -321,16 +330,14 @@ app.post('/auth/register', async (c) => {
     razorpayPaymentId: null,
   })
   if (!admin) {
-    notifyStudioSignup(
-      {
-        name: studio.name,
-        owner: studio.owner,
-        city: studio.city,
-        phone: studio.phone,
-        tagline: studio.tagline,
-      },
-      email,
-    )
+    const profile = {
+      name: studio.name,
+      owner: studio.owner,
+      city: studio.city,
+      phone: studio.phone,
+      tagline: studio.tagline,
+    }
+    await notifyStudioSignup(profile, email)
     const token = randomToken()
     await db.createToken({
       id: newId(),
@@ -340,11 +347,12 @@ app.post('/auth/register', async (c) => {
       expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 2).toISOString(),
       usedAt: null,
     })
-    void mailUser(
+    await notifyTrialWelcome({
       email,
-      'Confirm your GoldHour studio',
-      `Confirm this studio email:\n${APP_URL}/api/auth/verify?token=${token}\n\nIf you did not create a GoldHour desk, ignore this.`,
-    )
+      studio: profile,
+      trialEndsOn: trialEnd(),
+      verifyUrl: `${APP_URL}/api/auth/verify?token=${token}`,
+    })
   }
   await audit({ action: 'register', userId: user.id, studioId: studio.id, ip })
   await setSession(c, user.id)
@@ -394,7 +402,20 @@ app.post('/auth/login', async (c) => {
   await db.recordAuthAttempt(email, ip, true)
   await setSession(c, user.id, email === DEMO_EMAIL)
   await audit({ action: 'login.ok', userId: user.id, ip })
-  return c.json(await snapshot(user.id))
+  const data = await snapshot(user.id)
+  await notifyLogin({
+    email: user.email,
+    studio: {
+      name: data.studio.name,
+      owner: data.studio.owner,
+      city: data.studio.city,
+      phone: data.studio.phone,
+      tagline: data.studio.tagline,
+    },
+    ip,
+    demo: email === DEMO_EMAIL,
+  })
+  return c.json(data)
 })
 
 app.post('/auth/demo', async (c) => {
@@ -402,14 +423,16 @@ app.post('/auth/demo', async (c) => {
   if (await lockedOut('demo', ip)) {
     return c.json({ error: 'Too many attempts. Wait 15 minutes.' }, 429)
   }
-  const body = await readJson<{ pin?: string }>(c)
+  const body = await readJson<{ pin?: string; email?: string }>(c)
   if (body.pin?.trim() !== DEMO_PIN) {
     await getStore().recordAuthAttempt('demo', ip, false)
     return c.json({ error: 'Use PIN 2026 for the Madurai demo.' }, 401)
   }
+  const visitorEmail = body.email?.trim().toLowerCase() || ''
   const demo = await getStore().ensureDemo()
   await setSession(c, demo.id, true)
-  await audit({ action: 'login.demo', userId: demo.id, ip })
+  await audit({ action: 'login.demo', userId: demo.id, ip, detail: visitorEmail || 'no-email' })
+  await notifyDemoOpened({ ip, visitorEmail: emailOk(visitorEmail) ? visitorEmail : undefined })
   return c.json(await snapshot(demo.id))
 })
 
@@ -434,11 +457,16 @@ app.post('/auth/forgot', async (c) => {
     expiresAt: new Date(Date.now() + 1000 * 60 * 30).toISOString(),
     usedAt: null,
   })
-  void mailUser(
+  await mailUser(
     email,
     'Reset your GoldHour password',
     `Reset link (30 minutes):\n${APP_URL}/reset?token=${token}\n\nIf you did not ask for this, ignore the mail.`,
   )
+  await notifySimple({
+    email,
+    subject: `[GOLDHOUR] Password reset requested · ${email}`,
+    detail: 'They asked for a password reset link.',
+  })
   await audit({ action: 'password.forgot', userId: user.id, ip })
   return c.json(generic)
 })
@@ -454,7 +482,15 @@ app.post('/auth/reset', async (c) => {
   if (!row) return c.json({ error: 'That reset link is invalid or expired.' }, 400)
   await getStore().updatePassword(row.userId, hashPassword(password))
   await getStore().revokeUserSessions(row.userId)
+  const resetUser = await getStore().findUserById(row.userId)
   await audit({ action: 'password.reset', userId: row.userId, ip: clientIp(c) })
+  if (resetUser) {
+    await notifySimple({
+      email: resetUser.email,
+      subject: `[GOLDHOUR] Password changed · ${resetUser.email}`,
+      detail: 'They set a new password.',
+    })
+  }
   return c.json({ ok: true })
 })
 
@@ -465,6 +501,14 @@ app.get('/auth/verify', async (c) => {
   if (!row) return c.redirect(`${APP_URL}/login?verify=expired`)
   await getStore().markEmailVerified(row.userId)
   await audit({ action: 'email.verified', userId: row.userId, ip: clientIp(c) })
+  const verified = await getStore().findUserById(row.userId)
+  if (verified) {
+    await notifySimple({
+      email: verified.email,
+      subject: `[GOLDHOUR] Email confirmed · ${verified.email}`,
+      detail: 'They confirmed the studio email.',
+    })
+  }
   return c.redirect(`${APP_URL}/login?verify=ok`)
 })
 
@@ -515,7 +559,7 @@ app.put('/studio', async (c) => {
     quotations: nextQuotes,
     onboarded: typeof body.onboarded === 'boolean' ? body.onboarded : current.onboarded,
   })
-  notifyLeadChanges({
+  await notifyLeadChanges({
     email: actor.user.email,
     studio: profile,
     before: current.leads || [],
@@ -568,6 +612,18 @@ app.post('/studio/reset-demo', async (c) => {
     quotations: seeded.quotations,
   })
   await audit({ action: 'demo.reset', userId: actor.user.id, studioId: actor.studio.id, ip: clientIp(c) })
+  await notifySimple({
+    email: actor.user.email,
+    studio: {
+      name: actor.studio.name,
+      owner: actor.studio.owner,
+      city: actor.studio.city,
+      phone: actor.studio.phone,
+      tagline: actor.studio.tagline,
+    },
+    subject: `[GOLDHOUR DEMO] Desk reset`,
+    detail: 'They reset the Meenakshi Frames demo data.',
+  })
   return c.json(await snapshot(actor.user.id))
 })
 
@@ -614,6 +670,17 @@ app.post('/billing/checkout', async (c) => {
     createdAt: new Date().toISOString(),
   })
   await audit({ action: 'billing.checkout', userId: actor.user.id, studioId: actor.studio.id, detail: plan.id, ip: clientIp(c) })
+  await notifyCheckout(
+    {
+      name: actor.studio.name,
+      owner: actor.studio.owner,
+      city: actor.studio.city,
+      phone: actor.studio.phone,
+      tagline: actor.studio.tagline,
+    },
+    actor.user.email,
+    plan.id,
+  )
   return c.json({
     keyId,
     orderId: json.id,
@@ -649,7 +716,7 @@ app.post('/billing/confirm', async (c) => {
     return c.json({ error: 'Order not found.' }, 404)
   }
   await getStore().markOrderPaid(orderId, paymentId)
-  notifyPaid(actor.studio, actor.user.email, order.plan, order.amount)
+  await notifyPaid(actor.studio, actor.user.email, order.plan, order.amount)
   await audit({
     action: 'billing.paid',
     userId: actor.user.id,
@@ -684,7 +751,7 @@ app.post('/billing/webhook', async (c) => {
       const user = await getStore().findUserById(order.userId)
       const studio = await getStore().getStudio(order.userId)
       if (user && studio) {
-        notifyPaid(studio, user.email, order.plan, order.amount)
+        await notifyPaid(studio, user.email, order.plan, order.amount)
         await audit({ action: 'billing.paid', userId: user.id, studioId: studio.id, detail: `webhook:${order.plan}` })
       }
     }

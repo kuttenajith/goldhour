@@ -16,6 +16,8 @@ export function StudioLogin() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [pin, setPin] = useState('')
+  const [demoEmail, setDemoEmail] = useState('')
+  const [demoEmailHint, setDemoEmailHint] = useState('')
   const [error, setError] = useState('')
   const [emailHint, setEmailHint] = useState('')
   const [busy, setBusy] = useState(false)
@@ -43,12 +45,15 @@ export function StudioLogin() {
 
   async function openDemo(e: FormEvent) {
     e.preventDefault()
+    const mailHint = demoEmail.trim() ? emailError(demoEmail) : ''
+    setDemoEmailHint(mailHint)
     setError('')
+    if (mailHint) return
     setBusy(true)
     try {
       const data = await api<StudioSnapshot>('/api/auth/demo', {
         method: 'POST',
-        body: JSON.stringify({ pin }),
+        body: JSON.stringify({ pin, email: demoEmail.trim() || undefined }),
       })
       acceptSession(data)
       navigate(homeAfterAuth(data))
@@ -121,7 +126,7 @@ export function StudioLogin() {
           </Link>
         </p>
         <form onSubmit={openDemo} className="mt-10 max-w-sm space-y-3 border-t border-line pt-8">
-          <p className="text-sm text-mute">Just showing a client? Open Meenakshi Frames.</p>
+          <p className="text-sm text-mute">Walk the Madurai demo. Leave your email and we’ll send the 14-day trial offer.</p>
           <Field label="Demo PIN">
             <input
               className={fieldBox()}
@@ -129,6 +134,19 @@ export function StudioLogin() {
               onChange={(e) => setPin(onlyPhone(e.target.value).replace('+', '').slice(0, 4))}
               placeholder="2026"
               inputMode="numeric"
+            />
+          </Field>
+          <Field label="Your email (optional)" error={demoEmailHint} hint="We’ll mail the trial details. PIN still opens the desk.">
+            <input
+              className={fieldBox(demoEmailHint)}
+              type="email"
+              value={demoEmail}
+              onChange={(e) => {
+                const v = e.target.value.trim()
+                setDemoEmail(v)
+                setDemoEmailHint(v.includes('@') ? emailError(v) : '')
+              }}
+              placeholder="studio@email.com"
             />
           </Field>
           <Button type="submit" tone="ghost" className="w-full" disabled={busy}>

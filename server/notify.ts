@@ -1,10 +1,10 @@
 import type { Lead, Quotation, StudioProfile } from '../src/lib/types.ts'
 import { day, money, PAYMENT_LABEL, SERVICE_LABEL, SOURCE_LABEL, STATUS_LABEL } from '../src/lib/format.ts'
-import { ADMIN_EMAIL, DEMO_EMAIL, isAdminEmail } from './constants.ts'
+import { isAdminEmail } from './constants.ts'
+import { mailAdmin, mailUser } from './mail.ts'
+import { demoFollowLetter, trialWelcomeLetter } from './letters.ts'
 
-export { ADMIN_EMAIL, isAdminEmail }
-
-const WEB3FORMS_KEY = process.env.WEB3FORMS_ACCESS_KEY || 'e7e8e974-642c-411f-83ae-999cdbcdbb6e'
+export { isAdminEmail }
 
 function leadFingerprint(lead: Lead) {
   return JSON.stringify({
@@ -56,46 +56,86 @@ export function formatLead(lead: Lead) {
   ].join('\n')
 }
 
-export async function mailAdmin(subject: string, message: string) {
-  if (!WEB3FORMS_KEY) return
-  try {
-    await fetch('https://api.web3forms.com/submit', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({
-        access_key: WEB3FORMS_KEY,
-        subject,
-        from_name: 'GoldHour admin',
-        name: 'GoldHour admin',
-        email: ADMIN_EMAIL,
-        botcheck: false,
-        kind: 'admin',
-        message,
-      }),
-    })
-  } catch {
-    /* never block the studio desk */
-  }
+function block(studio: StudioProfile, email: string, extra: string[]) {
+  return [
+    `Studio: ${studio.name}`,
+    `Owner: ${studio.owner || '—'}`,
+    `City: ${studio.city || '—'}`,
+    `Phone: ${studio.phone || '—'}`,
+    `Email: ${email}`,
+    `When: ${new Date().toISOString()}`,
+    '',
+    ...extra,
+  ].join('\n')
 }
 
-export function notifyStudioSignup(studio: StudioProfile, email: string) {
-  if (isAdminEmail(email) || email === DEMO_EMAIL) return
-  void mailAdmin(
-    `[GOLDHOUR STUDIO] ${studio.name} signed up`,
-    [
-      'A photographer opened a GoldHour studio account.',
-      '',
-      `Studio: ${studio.name}`,
-      `Owner: ${studio.owner || '—'}`,
-      `City: ${studio.city || '—'}`,
-      `Phone: ${studio.phone || '—'}`,
-      `Email: ${email}`,
-      `When: ${new Date().toISOString()}`,
-    ].join('\n'),
+export async function notifyHq(subject: string, message: string, replyTo?: string) {
+  await mailAdmin(subject, message, replyTo)
+}
+
+export async function notifyStudioSignup(studio: StudioProfile, email: string) {
+  if (isAdminEmail(email)) return
+  await notifyHq(
+    `[GOLDHOUR STUDIO] ${studio.name} started a 14-day trial`,
+    block(studio, email, ['A photographer opened a GoldHour trial desk.']),
+    email,
   )
 }
 
-export function notifyLeadChanges(opts: {
+export async function notifyTrialWelcome(opts: {
+  email: string
+  studio: StudioProfile
+  trialEndsOn: string
+  verifyUrl: string
+}) {
+  if (isAdminEmail(opts.email)) return
+  const letter = trialWelcomeLetter({
+    owner: opts.studio.owner || opts.studio.name,
+    studio: opts.studio.name,
+    city: opts.studio.city,
+    trialEndsOn: opts.trialEndsOn,
+    verifyUrl: opts.verifyUrl,
+  })
+  await mailUser(opts.email, letter.subject, letter.text)
+}
+
+export async function notifyDemoOpened(opts: { ip: string; visitorEmail?: string }) {
+  const visitor = opts.visitorEmail || 'not left'
+  await notifyHq(
+    `[GOLDHOUR DEMO] Meenakshi Frames opened`,
+    [
+      'Someone opened the sample demo desk.',
+      '',
+      `Visitor email: ${visitor}`,
+      `IP: ${opts.ip}`,
+      `When: ${new Date().toISOString()}`,
+    ].join('\n'),
+    opts.visitorEmail,
+  )
+  if (!opts.visitorEmail) return
+  const letter = demoFollowLetter()
+  await mailUser(opts.visitorEmail, letter.subject, letter.text)
+}
+
+export async function notifyLogin(opts: { email: string; studio: StudioProfile; ip: string; demo?: boolean }) {
+  if (isAdminEmail(opts.email)) return
+  await notifyHq(
+    `[GOLDHOUR LOGIN] ${opts.studio.name}${opts.demo ? ' · demo' : ''}`,
+    block(opts.studio, opts.email, [`Signed in${opts.demo ? ' on the demo desk' : ''}.`, `IP: ${opts.ip}`]),
+    opts.email,
+  )
+}
+
+export async function notifyCheckout(studio: StudioProfile, email: string, plan: string) {
+  if (isAdminEmail(email)) return
+  await notifyHq(
+    `[GOLDHOUR CHECKOUT] ${studio.name} · ${plan}`,
+    block(studio, email, [`Opened Razorpay for ${plan}.`]),
+    email,
+  )
+}
+
+export async function notifyLeadChanges(opts: {
   email: string
   studio: StudioProfile
   before: Lead[]
@@ -103,7 +143,7 @@ export function notifyLeadChanges(opts: {
   quotationsBefore?: Quotation[]
   quotationsAfter?: Quotation[]
 }) {
-  if (isAdminEmail(opts.email) || opts.email === DEMO_EMAIL) return
+  if (isAdminEmail(opts.email)) return
   const prev = new Map(opts.before.map((l) => [l.id, l]))
   const next = new Map(opts.after.map((l) => [l.id, l]))
   const added = opts.after.filter((l) => !prev.has(l.id))
@@ -154,21 +194,28 @@ export function notifyLeadChanges(opts: {
   }
 
   const headline = added[0]?.coupleName || changed[0]?.coupleName || removed[0]?.coupleName || opts.studio.name
-  void mailAdmin(`[GOLDHOUR EVENT] ${opts.studio.name} · ${headline}`, blocks.join('\n'))
+  await notifyHq(`[GOLDHOUR EVENT] ${opts.studio.name} · ${headline}`, blocks.join('\n'), opts.email)
 }
 
-export function notifyPaid(studio: StudioProfile, email: string, plan: string, amountPaise: number) {
-  if (isAdminEmail(email) || email === DEMO_EMAIL) return
-  void mailAdmin(
+export async function notifyPaid(studio: StudioProfile, email: string, plan: string, amountPaise: number) {
+  if (isAdminEmail(email)) return
+  await notifyHq(
     `[GOLDHOUR PAID] ${studio.name} · ${plan}`,
-    [
-      'A studio paid for GoldHour.',
-      '',
-      `Studio: ${studio.name}`,
-      `Email: ${email}`,
-      `Plan: ${plan}`,
-      `Amount: ₹${Math.round(amountPaise / 100)}`,
-      `When: ${new Date().toISOString()}`,
-    ].join('\n'),
+    block(studio, email, [`Plan: ${plan}`, `Amount: ₹${Math.round(amountPaise / 100)}`]),
+    email,
   )
+}
+
+export async function notifySimple(opts: {
+  email: string
+  studio?: StudioProfile
+  subject: string
+  detail: string
+}) {
+  if (isAdminEmail(opts.email)) return
+  const studio = opts.studio
+  const body = studio
+    ? block(studio, opts.email, [opts.detail])
+    : [`Email: ${opts.email}`, opts.detail, `When: ${new Date().toISOString()}`].join('\n')
+  await notifyHq(opts.subject, body, opts.email)
 }
