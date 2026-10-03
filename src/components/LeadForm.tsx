@@ -1,10 +1,20 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { Field, fieldClass } from './Field.tsx'
+import { Field, fieldBox } from './Field.tsx'
 import { Button } from './Button.tsx'
 import { defaultEvents, FUNCTION_NAMES, splitPlan } from '../lib/booking.ts'
 import { id } from '../lib/ids.ts'
 import { todayIso } from '../lib/format.ts'
+import {
+  dateError,
+  dateMinFor,
+  moneyError,
+  nameError,
+  onlyMoney,
+  onlyName,
+  onlyPhone,
+  phoneError,
+} from '../lib/input.ts'
 import type { Lead, LeadSource, ServiceType } from '../lib/types.ts'
 
 function empty(): Lead {
@@ -40,7 +50,10 @@ export function LeadForm({
   onCancel: () => void
 }) {
   const [lead, setLead] = useState<Lead>(initial ?? empty())
+  const [errors, setErrors] = useState({ coupleName: '', phone: '', eventDate: '', budget: '' })
   const selected = lead.events.map((ev) => ev.name)
+  const minDate = dateMinFor(initial?.eventDate)
+  const budgetText = lead.budget ? String(lead.budget) : ''
 
   function toggleFunction(name: string) {
     const next = selected.includes(name)
@@ -57,6 +70,14 @@ export function LeadForm({
 
   function submit(e: FormEvent) {
     e.preventDefault()
+    const nextErrors = {
+      coupleName: nameError(lead.coupleName),
+      phone: phoneError(lead.phone),
+      eventDate: dateError(lead.eventDate, minDate),
+      budget: budgetText ? moneyError(budgetText) : '',
+    }
+    setErrors(nextErrors)
+    if (Object.values(nextErrors).some(Boolean)) return
     const events = lead.events.map((ev) => ({
       ...ev,
       date: ev.date || (ev.name === 'Wedding' ? lead.eventDate : ev.date),
@@ -71,57 +92,77 @@ export function LeadForm({
   }
 
   return (
-    <form onSubmit={submit} className="grid gap-4 sm:grid-cols-2">
-      <Field label="Client name">
+    <form onSubmit={submit} className="grid gap-4 sm:grid-cols-2" noValidate>
+      <Field label="Client name" error={errors.coupleName}>
         <input
           required
-          className={fieldClass}
+          className={fieldBox(errors.coupleName)}
           value={lead.coupleName}
-          onChange={(e) => setLead({ ...lead, coupleName: e.target.value })}
+          onChange={(e) => {
+            const coupleName = onlyName(e.target.value)
+            setLead({ ...lead, coupleName })
+            setErrors((prev) => ({ ...prev, coupleName: coupleName ? nameError(coupleName) : '' }))
+          }}
           placeholder="Priya & Arjun"
+          autoComplete="name"
         />
       </Field>
-      <Field label="Phone">
+      <Field label="Phone" error={errors.phone} hint="10-digit Indian mobile">
         <input
           required
-          className={fieldClass}
+          className={fieldBox(errors.phone)}
           value={lead.phone}
-          onChange={(e) => setLead({ ...lead, phone: e.target.value })}
+          inputMode="tel"
+          autoComplete="tel"
+          onChange={(e) => {
+            const phone = onlyPhone(e.target.value)
+            setLead({ ...lead, phone })
+            setErrors((prev) => ({ ...prev, phone: phone ? phoneError(phone) : '' }))
+          }}
           placeholder="98765 01234"
         />
       </Field>
-      <Field label="Wedding date">
+      <Field label="Wedding date" error={errors.eventDate}>
         <input
           required
           type="date"
-          className={fieldClass}
+          min={minDate}
+          className={fieldBox(errors.eventDate)}
           value={lead.eventDate}
-          onChange={(e) => setLead({ ...lead, eventDate: e.target.value })}
+          onChange={(e) => {
+            const eventDate = e.target.value
+            setLead({ ...lead, eventDate })
+            setErrors((prev) => ({ ...prev, eventDate: dateError(eventDate, minDate) }))
+          }}
         />
       </Field>
       <Field label="Venue">
         <input
-          className={fieldClass}
+          className={fieldBox()}
           value={lead.venue}
-          onChange={(e) => setLead({ ...lead, venue: e.target.value })}
+          onChange={(e) => setLead({ ...lead, venue: e.target.value.slice(0, 80) })}
           placeholder="Temple / palace / lawn"
         />
       </Field>
       <Field label="City">
         <input
-          className={fieldClass}
+          className={fieldBox()}
           value={lead.city}
-          onChange={(e) => setLead({ ...lead, city: e.target.value })}
+          onChange={(e) => setLead({ ...lead, city: onlyName(e.target.value) })}
           placeholder="Madurai"
         />
       </Field>
-      <Field label="Budget">
+      <Field label="Budget" error={errors.budget} hint="Numbers only, rupees">
         <input
-          type="number"
-          min={0}
-          className={fieldClass}
-          value={lead.budget || ''}
-          onChange={(e) => setLead({ ...lead, budget: Number(e.target.value) })}
+          className={fieldBox(errors.budget)}
+          value={budgetText}
+          inputMode="numeric"
+          onChange={(e) => {
+            const raw = onlyMoney(e.target.value)
+            setLead({ ...lead, budget: raw ? Number(raw) : 0 })
+            setErrors((prev) => ({ ...prev, budget: raw ? moneyError(raw) : '' }))
+          }}
+          placeholder="150000"
         />
       </Field>
       <div className="sm:col-span-2">
@@ -136,8 +177,8 @@ export function LeadForm({
                 onClick={() => toggleFunction(name)}
                 className={
                   on
-                    ? 'rounded-full bg-gold px-3 py-1.5 text-sm text-ink'
-                    : 'rounded-full border border-line px-3 py-1.5 text-sm text-mute'
+                    ? 'min-h-10 rounded-full bg-gold px-3 py-1.5 text-sm text-ink'
+                    : 'min-h-10 rounded-full border border-line px-3 py-1.5 text-sm text-mute'
                 }
               >
                 {name}
@@ -148,7 +189,7 @@ export function LeadForm({
       </div>
       <Field label="Source">
         <select
-          className={fieldClass}
+          className={fieldBox()}
           value={lead.source}
           onChange={(e) => setLead({ ...lead, source: e.target.value as LeadSource })}
         >
@@ -162,7 +203,7 @@ export function LeadForm({
       </Field>
       <Field label="Service">
         <select
-          className={fieldClass}
+          className={fieldBox()}
           value={lead.service}
           onChange={(e) => setLead({ ...lead, service: e.target.value as ServiceType })}
         >
@@ -174,14 +215,14 @@ export function LeadForm({
       <div className="sm:col-span-2">
         <Field label="Notes">
           <textarea
-            className={fieldClass + ' min-h-20'}
+            className={fieldBox() + ' min-h-20'}
             value={lead.notes}
-            onChange={(e) => setLead({ ...lead, notes: e.target.value })}
+            onChange={(e) => setLead({ ...lead, notes: e.target.value.slice(0, 500) })}
             placeholder="What they asked on WhatsApp"
           />
         </Field>
       </div>
-      <div className="flex justify-end gap-3 pt-2 sm:col-span-2">
+      <div className="flex flex-wrap justify-end gap-3 pt-2 sm:col-span-2">
         <Button tone="ghost" onClick={onCancel}>
           Cancel
         </Button>

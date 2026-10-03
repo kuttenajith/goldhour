@@ -3,9 +3,10 @@ import type { FormEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { BrandMark } from '../components/BrandMark.tsx'
 import { Button } from '../components/Button.tsx'
-import { Field, fieldClass } from '../components/Field.tsx'
+import { Field, fieldBox } from '../components/Field.tsx'
 import { SiteVisits } from '../components/SiteVisits.tsx'
 import { acceptSession, api, homeAfterAuth } from '../lib/store.ts'
+import { emailError, onlyPhone } from '../lib/input.ts'
 import type { StudioSnapshot } from '../lib/types.ts'
 import { asset } from '../lib/paths.ts'
 
@@ -17,11 +18,15 @@ export function StudioLogin() {
   const [password, setPassword] = useState('')
   const [pin, setPin] = useState('')
   const [error, setError] = useState('')
+  const [emailHint, setEmailHint] = useState('')
   const [busy, setBusy] = useState(false)
 
   async function submit(e: FormEvent) {
     e.preventDefault()
+    const mail = emailError(email)
+    setEmailHint(mail)
     setError('')
+    if (mail) return
     setBusy(true)
     try {
       const data = await api<StudioSnapshot>('/api/auth/login', {
@@ -56,7 +61,7 @@ export function StudioLogin() {
   }
 
   return (
-    <div className="grid min-h-screen lg:grid-cols-2">
+    <div className="grid min-h-dvh overflow-x-clip lg:grid-cols-2">
       <div className="relative hidden lg:block">
         <img
           src={asset('photos/mandap.png')}
@@ -70,7 +75,7 @@ export function StudioLogin() {
       </div>
       <div className="flex flex-col justify-center bg-ink px-6 py-16 sm:px-16">
         <BrandMark sweep />
-        <h1 className="mt-10 font-display text-5xl">Studio sign in</h1>
+        <h1 className="mt-10 font-display text-4xl sm:text-5xl">Studio sign in</h1>
         {verify === 'ok' ? <p className="mt-3 text-sm text-gold-soft">Email confirmed. Sign in.</p> : null}
         {verify === 'expired' ? <p className="mt-3 text-sm text-orange-200">That confirmation link expired.</p> : null}
         <p className="mt-3 max-w-md text-mute">
@@ -78,11 +83,15 @@ export function StudioLogin() {
           <span className="text-gold-soft">2026</span>.
         </p>
         <form onSubmit={submit} className="mt-10 max-w-sm space-y-5">
-          <Field label="Email">
+          <Field label="Email" error={emailHint}>
             <input
-              className={fieldClass}
+              className={fieldBox(emailHint)}
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                const v = e.target.value.trim()
+                setEmail(v)
+                setEmailHint(v.includes('@') ? emailError(v) : '')
+              }}
               type="email"
               autoComplete="email"
               placeholder="studio@email.com"
@@ -90,7 +99,7 @@ export function StudioLogin() {
           </Field>
           <Field label="Password">
             <input
-              className={fieldClass}
+              className={fieldBox()}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               type="password"
@@ -116,9 +125,9 @@ export function StudioLogin() {
           <p className="text-sm text-mute">Just showing a client? Open Meenakshi Frames.</p>
           <Field label="Demo PIN">
             <input
-              className={fieldClass}
+              className={fieldBox()}
               value={pin}
-              onChange={(e) => setPin(e.target.value)}
+              onChange={(e) => setPin(onlyPhone(e.target.value).replace('+', '').slice(0, 4))}
               placeholder="2026"
               inputMode="numeric"
             />

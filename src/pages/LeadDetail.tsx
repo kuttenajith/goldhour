@@ -3,7 +3,7 @@ import type { FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Check, MessageCircle, Plus } from 'lucide-react'
 import { Button } from '../components/Button.tsx'
-import { Field, fieldClass } from '../components/Field.tsx'
+import { Field, fieldBox } from '../components/Field.tsx'
 import { LeadForm } from '../components/LeadForm.tsx'
 import { Modal } from '../components/Modal.tsx'
 import { Pipeline } from '../components/Pipeline.tsx'
@@ -11,6 +11,7 @@ import { StatusPill } from '../components/StatusPill.tsx'
 import { paidOf, splitPlan, weddingEvent } from '../lib/booking.ts'
 import { addDays, clock, day, money, paid, PAYMENT_LABEL, todayIso } from '../lib/format.ts'
 import { id } from '../lib/ids.ts'
+import { moneyError, onlyMoney } from '../lib/input.ts'
 import { downloadQuotation } from '../lib/pdf.ts'
 import {
   addPayment,
@@ -61,21 +62,21 @@ export function LeadDetail() {
   return (
     <div className="space-y-6 sm:space-y-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
+        <div className="min-w-0">
           <Link to="/studio/leads" className="text-xs uppercase tracking-[0.22em] text-gold-soft">
             ← Leads
           </Link>
-          <h1 className="mt-3 font-display text-4xl sm:text-5xl">{lead.coupleName}</h1>
-          <p className="mt-2 text-sm text-mute sm:text-base">
-            {lead.venue || lead.city} · {lead.phone}
-          </p>
+          <h1 className="mt-3 font-display text-3xl leading-tight sm:text-5xl">{lead.coupleName}</h1>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-mute sm:text-base">
+            <StatusPill status={lead.status} />
+            <span>
+              {lead.venue || lead.city} · {lead.phone}
+            </span>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <StatusPill status={lead.status} />
-          <Button tone="ghost" onClick={() => setEditing(true)}>
-            Edit
-          </Button>
-        </div>
+        <Button tone="ghost" onClick={() => setEditing(true)}>
+          Edit
+        </Button>
       </div>
 
       <Pipeline status={lead.status} />
@@ -302,7 +303,7 @@ function WaButton({ href, children }: { href: string; children: string }) {
       href={href}
       target="_blank"
       rel="noreferrer"
-      className="inline-flex items-center justify-center gap-2 rounded-full border border-gold/40 px-4 py-2.5 text-sm text-gold-soft hover:border-gold hover:text-cream"
+      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-gold/40 px-4 py-2.5 text-center text-sm text-gold-soft hover:border-gold hover:text-cream"
     >
       <MessageCircle size={16} /> {children}
     </a>
@@ -420,9 +421,13 @@ function PaymentModal({
   const [amount, setAmount] = useState('')
   const [kind, setKind] = useState<PaymentKind>('advance')
   const [note, setNote] = useState('')
+  const [error, setError] = useState('')
 
   function submit(e: FormEvent) {
     e.preventDefault()
+    const msg = moneyError(amount)
+    setError(msg)
+    if (msg) return
     onSave({
       id: id(),
       amount: Number(amount),
@@ -434,20 +439,23 @@ function PaymentModal({
 
   return (
     <Modal title="Record payment" onClose={onClose}>
-      <form onSubmit={submit} className="space-y-4">
-        <Field label="Amount">
+      <form onSubmit={submit} className="space-y-4" noValidate>
+        <Field label="Amount" error={error} hint="Numbers only">
           <input
             required
-            type="number"
-            min={1}
-            className={fieldClass}
+            inputMode="numeric"
+            className={fieldBox(error)}
             value={amount}
-            onChange={(e) => setAmount(e.target.value)}
+            onChange={(e) => {
+              const next = onlyMoney(e.target.value)
+              setAmount(next)
+              setError(next ? moneyError(next) : '')
+            }}
           />
         </Field>
         <Field label="Stage">
           <select
-            className={fieldClass}
+            className={fieldBox()}
             value={kind}
             onChange={(e) => setKind(e.target.value as PaymentKind)}
           >
@@ -458,9 +466,9 @@ function PaymentModal({
           </select>
         </Field>
         <Field label="Note">
-          <input className={fieldClass} value={note} onChange={(e) => setNote(e.target.value)} placeholder="UPI / cash / transfer" />
+          <input className={fieldBox()} value={note} onChange={(e) => setNote(e.target.value.slice(0, 80))} placeholder="UPI / cash / transfer" />
         </Field>
-        <div className="flex justify-end gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
           <Button tone="ghost" onClick={onClose}>
             Cancel
           </Button>
@@ -492,41 +500,48 @@ function QuoteModal({
   const [packageName, setPackageName] = useState(defaultName)
   const [amount, setAmount] = useState(String(lead.packageAmount || lead.budget || ''))
   const [notes, setNotes] = useState(lead.notes)
+  const [error, setError] = useState('')
 
   function submit(e: FormEvent) {
     e.preventDefault()
+    const msg = moneyError(amount)
+    setError(msg)
+    if (msg || !packageName.trim()) return
     onSave(packageName, Number(amount), notes)
   }
 
   return (
     <Modal title="Quotation" onClose={onClose}>
-      <form onSubmit={submit} className="space-y-4">
+      <form onSubmit={submit} className="space-y-4" noValidate>
         <Field label="Package">
           <input
             required
-            className={fieldClass}
+            className={fieldBox()}
             value={packageName}
-            onChange={(e) => setPackageName(e.target.value)}
+            onChange={(e) => setPackageName(e.target.value.slice(0, 80))}
           />
         </Field>
-        <Field label="Amount">
+        <Field label="Amount" error={error} hint="Numbers only">
           <input
             required
-            type="number"
-            min={1}
-            className={fieldClass}
+            inputMode="numeric"
+            className={fieldBox(error)}
             value={amount}
-            onChange={(e) => setAmount(e.target.value)}
+            onChange={(e) => {
+              const next = onlyMoney(e.target.value)
+              setAmount(next)
+              setError(next ? moneyError(next) : '')
+            }}
           />
         </Field>
         <Field label="Notes on the PDF">
           <textarea
-            className={fieldClass + ' min-h-24'}
+            className={fieldBox() + ' min-h-24'}
             value={notes}
-            onChange={(e) => setNotes(e.target.value)}
+            onChange={(e) => setNotes(e.target.value.slice(0, 500))}
           />
         </Field>
-        <div className="flex justify-end gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
           <Button tone="ghost" onClick={onClose}>
             Cancel
           </Button>

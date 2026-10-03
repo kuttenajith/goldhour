@@ -66,7 +66,7 @@ export function Landing() {
   return (
     <div className="bg-ink text-cream">
       <header className="sticky top-0 z-30 border-b border-line bg-ink/80 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <BrandMark />
           <nav className="hidden items-center gap-8 text-sm text-mute md:flex">
             <a href="#product" className="hover:text-cream">
@@ -82,8 +82,8 @@ export function Landing() {
               <Button>Start free trial</Button>
             </Link>
           </nav>
-          <Link to="/signup" className="md:hidden">
-            <Button>Start trial</Button>
+          <Link to="/signup" className="shrink-0 md:hidden">
+            <Button className="px-3 text-xs sm:px-4">Start trial</Button>
           </Link>
         </div>
       </header>

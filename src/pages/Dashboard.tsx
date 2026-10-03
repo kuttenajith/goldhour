@@ -29,7 +29,7 @@ export function Dashboard() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-xs uppercase tracking-[0.28em] text-gold-soft">{studio.name}</p>
-          <h1 className="mt-2 font-display text-4xl sm:text-5xl">Your day.</h1>
+          <h1 className="mt-2 font-display text-3xl sm:text-5xl">Your day.</h1>
           <p className="mt-2 text-mute">
             {enquiries.length} new · {booked.length} booked · {studio.city}
           </p>
@@ -108,11 +108,11 @@ export function Dashboard() {
             <p className="text-xs uppercase tracking-[0.22em] text-mute">Follow-ups</p>
             <ul className="mt-4 space-y-3">
               {followToday.slice(0, 5).map((l) => (
-                <li key={l.id} className="flex items-center justify-between gap-3 text-sm">
-                  <Link to={`/studio/leads/${l.id}`} className="hover:text-gold-soft">
+                <li key={l.id} className="flex items-start justify-between gap-3 text-sm">
+                  <Link to={`/studio/leads/${l.id}`} className="min-w-0 truncate hover:text-gold-soft">
                     {l.coupleName.split(' ')[0]}
                   </Link>
-                  <span className="text-right text-gold-soft">{l.nextAction}</span>
+                  <span className="max-w-[62%] text-right text-gold-soft">{l.nextAction}</span>
                 </li>
               ))}
               {followToday.length === 0 ? <li className="text-mute">Nothing waiting today.</li> : null}

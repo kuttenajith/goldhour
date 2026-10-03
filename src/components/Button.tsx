@@ -22,9 +22,8 @@ export function Button({
       onClick={onClick}
       disabled={disabled}
       className={clsx(
-        'inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm tracking-wide transition',
-        tone === 'gold' &&
-          'bg-gold text-ink hover:bg-gold-soft',
+        'inline-flex min-h-11 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-full px-4 text-center text-sm leading-tight tracking-wide transition sm:px-5',
+        tone === 'gold' && 'bg-gold text-ink hover:bg-gold-soft',
         tone === 'ghost' &&
           'border border-gold/35 bg-transparent text-gold-soft hover:border-gold hover:text-cream',
         tone === 'cream' && 'bg-cream text-ink hover:bg-gold-soft',

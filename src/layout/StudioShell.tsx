@@ -12,6 +12,7 @@ import {
   Users,
 } from 'lucide-react'
 import { BrandMark } from '../components/BrandMark.tsx'
+import { Copilot } from '../components/Copilot.tsx'
 import { ThemeToggle } from '../components/ThemeToggle.tsx'
 import { Onboarding } from '../components/Onboarding.tsx'
 import { SiteVisits } from '../components/SiteVisits.tsx'
@@ -36,16 +37,17 @@ export function StudioShell() {
   const navigate = useNavigate()
 
   return (
-    <div className="min-h-screen bg-ink text-cream lg:grid lg:grid-cols-[240px_1fr]">
+    <div className="relative h-dvh max-h-dvh overflow-hidden bg-ink text-cream">
       <Onboarding />
-      <aside className="relative hidden overflow-hidden border-r border-line lg:flex lg:flex-col">
+      <div className="flex h-full max-h-full overflow-hidden lg:grid lg:grid-cols-[220px_minmax(0,1fr)]">
+      <aside className="relative hidden min-h-0 overflow-hidden border-r border-line lg:flex lg:h-dvh lg:flex-col">
         <img
           src={asset('photos/photographer.png')}
           alt=""
           className="absolute inset-0 h-full w-full object-cover opacity-30"
         />
         <div className="absolute inset-0 bg-gradient-to-b from-ink via-ink/85 to-ink" />
-        <div className="relative flex h-full flex-col p-6">
+        <div className="relative flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden p-5">
           <BrandMark sweep />
           <p className="mt-3 text-xs uppercase tracking-[0.22em] text-gold-soft">
             {studio.city} studio desk
@@ -53,12 +55,12 @@ export function StudioShell() {
           {isAdmin ? (
             <Link
               to="/admin"
-              className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-gold/15 px-3 py-2.5 text-sm text-gold-soft"
+              className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-2xl bg-gold/15 px-3 py-2 text-sm text-gold-soft"
             >
               Open HQ · all studios
             </Link>
           ) : null}
-          <nav className="mt-10 space-y-1">
+          <nav className="mt-6 space-y-0.5">
             {links.map((link) => (
               <NavLink
                 key={link.to}
@@ -66,7 +68,7 @@ export function StudioShell() {
                 end={link.end}
                 className={({ isActive }) =>
                   clsx(
-                    'flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm transition',
+                    'flex min-h-10 items-center gap-3 rounded-2xl px-3 py-2 text-sm transition',
                     isActive
                       ? 'bg-gold/15 text-gold-soft'
                       : 'text-cream/75 hover:bg-white/5 hover:text-cream',
@@ -78,12 +80,12 @@ export function StudioShell() {
               </NavLink>
             ))}
           </nav>
-          <div className="mt-auto rounded-3xl border border-line bg-ink/70 p-4 backdrop-blur">
+          <div className="mt-auto rounded-3xl border border-line bg-ink/70 p-3 backdrop-blur">
             <div className="flex items-center gap-2 text-gold-soft">
               <Camera size={16} />
               <span className="text-xs uppercase tracking-[0.18em]">Studio</span>
             </div>
-            <p className="mt-2 font-display text-2xl">{studio.name}</p>
+            <p className="mt-2 font-display text-xl leading-tight">{studio.name}</p>
             <p className="text-sm text-mute">{studio.owner}</p>
             <p className="mt-3 text-xs text-gold-soft">
               <SiteVisits />
@@ -92,7 +94,7 @@ export function StudioShell() {
               <ThemeToggle />
             </div>
             <button
-              className="mt-4 inline-flex items-center gap-2 text-sm text-mute hover:text-cream"
+              className="mt-3 inline-flex min-h-10 items-center gap-2 text-sm text-mute hover:text-cream"
               onClick={() => {
                 logoutStudio()
                 navigate('/')
@@ -104,21 +106,21 @@ export function StudioShell() {
         </div>
       </aside>
 
-      <div className="min-h-screen pb-2">
-        <header className="sticky top-0 z-20 flex items-center justify-between border-b border-line bg-ink/80 px-4 py-3 backdrop-blur lg:hidden">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-line bg-ink/90 px-4 py-3 lg:hidden">
           <BrandMark />
-          <span className="flex items-center gap-3">
+          <span className="flex min-w-0 items-center gap-3">
             {isAdmin ? (
-              <Link to="/admin" className="text-xs uppercase tracking-[0.18em] text-gold-soft">
+              <Link to="/admin" className="shrink-0 text-xs uppercase tracking-[0.18em] text-gold-soft">
                 HQ
               </Link>
             ) : null}
-            <span className="max-w-[40%] truncate text-xs uppercase tracking-[0.18em] text-gold-soft">
+            <span className="truncate text-xs uppercase tracking-[0.18em] text-gold-soft">
               {studio.name}
             </span>
           </span>
         </header>
-        <nav className="sticky top-[57px] z-20 flex gap-1 overflow-x-auto border-b border-line bg-ink/90 px-3 py-2 lg:hidden">
+        <nav className="flex shrink-0 gap-1 overflow-x-auto border-b border-line bg-ink/90 px-3 py-2 lg:hidden">
           {links.map((link) => (
             <NavLink
               key={link.to}
@@ -126,7 +128,7 @@ export function StudioShell() {
               end={link.end}
               className={({ isActive }) =>
                 clsx(
-                  'whitespace-nowrap rounded-full px-3 py-1.5 text-xs uppercase tracking-wider',
+                  'inline-flex min-h-9 shrink-0 items-center whitespace-nowrap rounded-full px-3 py-1.5 text-xs uppercase tracking-wider',
                   isActive ? 'bg-gold text-ink' : 'text-mute',
                 )
               }
@@ -135,7 +137,7 @@ export function StudioShell() {
             </NavLink>
           ))}
         </nav>
-        <main className="page-rise px-4 py-6 sm:px-8 sm:py-8">
+        <main className="page-rise min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-5 sm:px-8 sm:py-7">
           {billing.status === 'trialing' ? (
             <Link
               to="/studio/billing"
@@ -147,6 +149,8 @@ export function StudioShell() {
           <Outlet />
         </main>
       </div>
+      </div>
+      <Copilot />
     </div>
   )
 }
