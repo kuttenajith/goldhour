@@ -1,4 +1,4 @@
-import type { Lead, StudioSnapshot } from './types.ts'
+import type { AdminOverview, Lead, StudioSnapshot } from './types.ts'
 import { outstanding } from './booking.ts'
 import { day, money, paid, todayIso } from './format.ts'
 
@@ -13,6 +13,17 @@ function q(s: string) {
   return s.toLowerCase().replace(/[’']/g, '').trim()
 }
 
+export function firstName(snap: StudioSnapshot) {
+  const owner = snap.studio.owner?.trim()
+  if (owner) return owner.split(/\s+/)[0]
+  const mail = snap.email.split('@')[0]
+  return mail || 'there'
+}
+
+export function greeting(snap: StudioSnapshot) {
+  return `Hi ${firstName(snap)}, how can I help you?`
+}
+
 function upcoming(leads: Lead[]) {
   const today = todayIso()
   return leads
@@ -20,8 +31,62 @@ function upcoming(leads: Lead[]) {
     .sort((a, b) => a.eventDate.localeCompare(b.eventDate))
 }
 
-export function answerCopilot(ask: string, snap: StudioSnapshot): CopilotReply {
+function answerHq(ask: string, hq: AdminOverview): CopilotReply {
   const text = q(ask)
+  const live = hq.tenants.filter((t) => !t.isAdmin && !t.isDemo)
+  const paying = live.filter((t) => t.billing.status === 'active')
+  const trial = live.filter((t) => t.billing.status === 'trialing')
+  const events = live.reduce((s, t) => s + t.leads.length, 0)
+
+  if (/pay|subscri|active/.test(text)) {
+    if (!paying.length) return { text: 'No paying studios yet.', links: [{ href: '/admin', label: 'Open HQ' }] }
+    return {
+      text: `${paying.length} paying studio${paying.length === 1 ? '' : 's'}:\n` + paying.slice(0, 8).map((t) => `• ${t.studio.name} — ${t.email}`).join('\n'),
+      links: [{ href: '/admin', label: 'Open HQ' }],
+    }
+  }
+  if (/trial/.test(text)) {
+    if (!trial.length) return { text: 'Nobody is on trial right now.', links: [{ href: '/admin', label: 'Open HQ' }] }
+    return {
+      text: `${trial.length} on trial:\n` + trial.slice(0, 8).map((t) => `• ${t.studio.name} — until ${t.billing.trialEndsOn || '—'}`).join('\n'),
+      links: [{ href: '/admin', label: 'Open HQ' }],
+    }
+  }
+  if (/how many|studio|desk|tenant/.test(text)) {
+    return {
+      text: `${live.length} live studio${live.length === 1 ? '' : 's'}. ${paying.length} paying, ${trial.length} on trial, ${events} events on file.`,
+      links: [{ href: '/admin', label: 'Open HQ' }],
+    }
+  }
+  if (/event|wedding|lead|enquir/.test(text)) {
+    return {
+      text: `${events} events across every live desk.`,
+      links: [{ href: '/admin', label: 'Open HQ' }],
+    }
+  }
+  const named = live.find((t) => text.includes(t.studio.name.toLowerCase()) || text.includes(t.studio.owner.split(/\s+/)[0]?.toLowerCase() || '___'))
+  if (named) {
+    return {
+      text: `${named.studio.name} (${named.email}) — ${named.billing.status}, ${named.leads.length} events, owner ${named.studio.owner || '—'}.`,
+      links: [{ href: '/admin', label: 'Open HQ' }],
+    }
+  }
+  return {
+    text: `HQ has ${live.length} studios, ${paying.length} paying, ${trial.length} on trial. Ask me who is paying, who is on trial, or how many events are on file.`,
+    links: [{ href: '/admin', label: 'Open HQ' }, { href: '/studio', label: 'My desk' }],
+  }
+}
+
+export function answerCopilot(ask: string, snap: StudioSnapshot, hq?: AdminOverview | null): CopilotReply {
+  const text = q(ask)
+  if (snap.isAdmin && hq && /studio|hq|pay|trial|tenant|operator|how many/.test(text)) {
+    return answerHq(ask, hq)
+  }
+  if (snap.isAdmin && /hq|admin|operator/.test(text)) {
+    if (!hq) return { text: 'Give me a moment — I am opening every desk.' }
+    return answerHq(ask, hq)
+  }
+
   const { leads, studio } = snap
   const follow = leads.filter(
     (l) =>
@@ -84,13 +149,16 @@ export function answerCopilot(ask: string, snap: StudioSnapshot): CopilotReply {
       links: [{ href: `/studio/leads/${named.id}`, label: `Open ${named.coupleName}` }],
     }
   }
+  if (snap.isAdmin && hq) return answerHq(ask, hq)
 
   return {
-    text: 'Ask things like: who needs follow-up, unpaid bookings, quotations waiting, what is collected, or which wedding is next. I read this studio only — I will not delete or refund from chat.',
-    links: [
-      { href: '/studio/follow-ups', label: 'Follow-ups' },
-      { href: '/studio/payments', label: 'Payments' },
-      { href: '/studio/calendar', label: 'Calendar' },
-    ],
+    text: `Ask me who needs follow-up, unpaid bookings, quotations waiting, or which wedding is next${snap.isAdmin ? ' — or how HQ studios are doing' : ''}. I will not delete or refund from chat.`,
+    links: snap.isAdmin
+      ? [{ href: '/admin', label: 'HQ' }, { href: '/studio/follow-ups', label: 'Follow-ups' }]
+      : [
+          { href: '/studio/follow-ups', label: 'Follow-ups' },
+          { href: '/studio/payments', label: 'Payments' },
+          { href: '/studio/calendar', label: 'Calendar' },
+        ],
   }
 }

@@ -2,6 +2,8 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { StudioShell } from './layout/StudioShell.tsx'
 import { RequireAdmin, RequireAuth, RequireStudio } from './layout/RequireStudio.tsx'
 import { VisitTracker } from './components/VisitTracker.tsx'
+import { Padmavathi } from './components/Padmavathi.tsx'
+import { TabGuard } from './components/TabGuard.tsx'
 import { Landing } from './pages/Landing.tsx'
 import { StudioLogin } from './pages/StudioLogin.tsx'
 import { Signup } from './pages/Signup.tsx'
@@ -31,6 +33,8 @@ export function App() {
   return (
     <BrowserRouter basename={basename()}>
       <VisitTracker />
+      <TabGuard />
+      <Padmavathi />
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<StudioLogin />} />

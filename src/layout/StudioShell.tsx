@@ -12,7 +12,6 @@ import {
   Users,
 } from 'lucide-react'
 import { BrandMark } from '../components/BrandMark.tsx'
-import { Copilot } from '../components/Copilot.tsx'
 import { ThemeToggle } from '../components/ThemeToggle.tsx'
 import { Onboarding } from '../components/Onboarding.tsx'
 import { SiteVisits } from '../components/SiteVisits.tsx'
@@ -150,7 +149,6 @@ export function StudioShell() {
         </main>
       </div>
       </div>
-      <Copilot />
     </div>
   )
 }

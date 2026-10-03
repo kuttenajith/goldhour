@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import { normalizeLead } from './booking.ts'
+import { claimTab, isTabStale, releaseTab } from './tabLock.ts'
 import type { Lead, Payment, Quotation, StudioProfile, StudioSnapshot } from './types.ts'
 
 const EMPTY: StudioSnapshot = {
@@ -50,6 +51,10 @@ function apply(next: Session) {
 }
 
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
+  const method = (init?.method || 'GET').toUpperCase()
+  if (isTabStale() && method !== 'GET' && path !== '/api/auth/logout') {
+    throw new Error('This tab is locked. The desk is open in another tab.')
+  }
   const res = await fetch(path, {
     credentials: 'include',
     ...init,
@@ -70,6 +75,7 @@ export async function bootSession() {
   try {
     const data = await api<StudioSnapshot>('/api/studio')
     apply({ status: 'in', data: hydrate(data) })
+    claimTab()
   } catch {
     apply({ status: 'guest' })
   }
@@ -80,6 +86,7 @@ function current(): StudioSnapshot {
 }
 
 async function persist(next: StudioSnapshot) {
+  if (isTabStale()) return
   apply({ status: 'in', data: next })
   try {
     const data = await api<StudioSnapshot>('/api/studio', {
@@ -117,6 +124,7 @@ export function sessionStatus() {
 
 export function acceptSession(data: StudioSnapshot) {
   apply({ status: 'in', data: hydrate(data) })
+  claimTab()
 }
 
 export function homeAfterAuth(data: StudioSnapshot) {
@@ -129,6 +137,7 @@ export async function logoutStudio() {
   } catch {
     /* still leave */
   }
+  releaseTab()
   apply({ status: 'guest' })
 }
 

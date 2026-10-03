@@ -95,6 +95,7 @@ async function setSession(c: Context, userId: string, demo = false) {
   const sid = newId()
   const now = new Date()
   const expires = new Date(now.getTime() + 60 * 60 * 24 * SESSION_DAYS * 1000)
+  await getStore().revokeUserSessions(userId)
   await getStore().createSession({
     id: sid,
     userId,
