@@ -18,7 +18,7 @@ const steps = [
   },
   {
     title: 'Run one wedding',
-    copy: 'Open a booked couple and walk the day: payments, events, timeline. Then put your next real enquiry on this desk.',
+    copy: 'Open a booked couple and walk the day: payments, events, timeline. Pulse and the chatbot sit on Studio Pro after the trial. Then put your next real enquiry on this desk.',
   },
 ]
 

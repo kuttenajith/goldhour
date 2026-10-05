@@ -1,6 +1,7 @@
 import type { AdminOverview, Lead, StudioSnapshot } from './types.ts'
 import { outstanding } from './booking.ts'
 import { day, money, paid, todayIso } from './format.ts'
+import { conversion, dateClashes, morningBrief, sourceMix } from './studioPulse.ts'
 
 export type CopilotLink = { href: string; label: string }
 
@@ -123,6 +124,36 @@ export function answerCopilot(ask: string, snap: StudioSnapshot, hq?: AdminOverv
       links: [{ href: '/studio/quotations', label: 'Open quotations' }],
     }
   }
+  if (/win rate|conversion|pipeline|how (is|are) (we|the desk) doing|pulse/.test(text)) {
+    const stats = conversion(leads)
+    return {
+      text: `Win rate ${stats.decided ? `${stats.rate}%` : 'needs a booked or lost couple first'}. Pipeline ${money(stats.pipelineValue)}. Booked ${money(stats.bookedValue)}. Collected ${money(stats.collected)}. Open Pulse for the full board.`,
+      links: [{ href: '/studio/activity', label: 'Open Pulse' }, { href: '/studio/pipeline', label: 'Open pipeline' }],
+    }
+  }
+  if (/source|instagram|referral|where.*lead|where.*coupl/.test(text)) {
+    const mix = sourceMix(leads)
+    if (!mix.length) return { text: 'No sources on file yet. Save the next enquiry with Instagram, WhatsApp or referral.' }
+    return {
+      text: mix.map((row) => `• ${row.label} — ${row.count} enquir${row.count === 1 ? 'y' : 'ies'}, ${row.booked} booked`).join('\n'),
+      links: [{ href: '/studio/activity', label: 'Open Pulse' }],
+    }
+  }
+  if (/clash|double.?book|same day|conflict/.test(text)) {
+    const clashes = dateClashes(leads)
+    if (!clashes.length) return { text: 'No two booked weddings share a date.', links: [{ href: '/studio/calendar', label: 'Open calendar' }] }
+    return {
+      text: clashes.map((c) => `• ${day(c.date)} — ${c.leads.map((l) => l.coupleName).join(', ')}`).join('\n'),
+      links: [{ href: '/studio/calendar', label: 'Open calendar' }],
+    }
+  }
+  if (/briefing|this morning|today.?desk/.test(text)) {
+    const brief = morningBrief(leads)
+    return {
+      text: `${brief.follow} follow-ups, ${brief.clashes} date clashes, ${brief.stale} quiet quotes, ${brief.unpaid} unpaid bookings.${brief.nextWedding ? ` Next wedding: ${brief.nextWedding.coupleName} on ${day(brief.nextWedding.eventDate)}.` : ''}`,
+      links: [{ href: '/studio/activity', label: 'Open Pulse' }],
+    }
+  }
   if (/collect|revenue|this month|earned|made/.test(text)) {
     return { text: `${studio.name} has collected ${money(collected)} on the books. Outstanding is ${money(pending)}.` }
   }
@@ -152,12 +183,12 @@ export function answerCopilot(ask: string, snap: StudioSnapshot, hq?: AdminOverv
   if (snap.isAdmin && hq) return answerHq(ask, hq)
 
   return {
-    text: `Ask me who needs follow-up, unpaid bookings, quotations waiting, or which wedding is next${snap.isAdmin ? ' — or how HQ studios are doing' : ''}. I will not delete or refund from chat.`,
+    text: `Ask me who needs follow-up, unpaid bookings, quotations waiting, win rate, date clashes, or which wedding is next${snap.isAdmin ? ' — or how HQ studios are doing' : ''}. I will not delete or refund from chat.`,
     links: snap.isAdmin
       ? [{ href: '/admin', label: 'HQ' }, { href: '/studio/follow-ups', label: 'Follow-ups' }]
       : [
+          { href: '/studio/activity', label: 'Pulse' },
           { href: '/studio/follow-ups', label: 'Follow-ups' },
-          { href: '/studio/payments', label: 'Payments' },
           { href: '/studio/calendar', label: 'Calendar' },
         ],
   }

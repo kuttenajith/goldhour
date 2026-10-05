@@ -11,7 +11,7 @@ import type { AdminOverview } from '../lib/types.ts'
 
 type Line = { role: 'you' | 'desk'; text: string; links?: { href: string; label: string }[] }
 
-const deskChips = ['Who needs follow-up?', 'Unpaid bookings', 'Quotations waiting', 'Next wedding']
+const deskChips = ['Morning briefing', 'Win rate', 'Date clashes', 'Who needs follow-up?']
 const hqChips = ['How many studios?', 'Who is paying?', 'Who is on trial?', 'Who needs follow-up?']
 
 export function Padmavathi() {
@@ -100,7 +100,7 @@ export function Padmavathi() {
             <div className="flex items-center justify-between border-b border-line px-4 py-3">
               <div>
                 <p className="text-xs uppercase tracking-[0.2em] text-gold-soft">Padmavathi</p>
-                <p className="text-[11px] text-mute">{onHq ? 'HQ assistant' : 'Studio desk'}</p>
+                <p className="text-[11px] text-mute">{onHq ? 'HQ chatbot' : 'Desk chatbot'}</p>
               </div>
               <button type="button" className="text-mute hover:text-cream" onClick={() => setOpen(false)} aria-label="Close Padmavathi">
                 <X size={16} />
@@ -144,7 +144,7 @@ export function Padmavathi() {
                 className="min-w-0 flex-1 rounded-xl border border-line bg-ink px-3 py-2 text-sm outline-none focus:border-gold/60"
                 value={ask}
                 onChange={(e) => setAsk(e.target.value)}
-                placeholder="Ask Padmavathi…"
+                placeholder="Ask the desk chatbot…"
               />
               <button type="submit" className="shrink-0 rounded-full bg-gold px-4 py-2 text-sm text-ink">
                 Ask

@@ -834,14 +834,19 @@ app.get('/notices', async (c) => {
   }
   const sub = await db.getSub(actor.user.id)
   const audit = await billingAwareAudit(actor.studio.id)
+  const billing = {
+    status: sub ? billingStatus(sub).status : actor.user.email === DEMO_EMAIL ? 'active' : 'trialing',
+    trialEndsOn: sub?.trialEndsOn || '',
+    plan: sub ? billingStatus(sub).plan : 'trial',
+  }
+  const pro =
+    actor.user.email === DEMO_EMAIL || billing.status === 'trialing' || billing.plan === 'studio_pro'
   return c.json({
     notices: studioNotices({
       leads: actor.studio.leads || [],
-      billing: {
-        status: sub ? billingStatus(sub).status : actor.user.email === DEMO_EMAIL ? 'active' : 'trialing',
-        trialEndsOn: sub?.trialEndsOn || '',
-      },
+      billing,
       audit,
+      pro,
     }),
   })
 })

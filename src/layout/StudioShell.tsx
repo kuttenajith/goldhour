@@ -5,6 +5,7 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
+  Columns3,
   CreditCard,
   FileText,
   IndianRupee,
@@ -33,10 +34,11 @@ const links: { to: string; label: string; icon: typeof LayoutDashboard; end?: bo
   { to: '/studio/leads', label: 'Leads', icon: Users },
   { to: '/studio/bookings', label: 'Bookings', icon: CalendarDays },
   { to: '/studio/calendar', label: 'Calendar', icon: CalendarDays, pro: true },
+  { to: '/studio/pipeline', label: 'Pipeline', icon: Columns3, pro: true },
   { to: '/studio/follow-ups', label: 'Follow-ups', icon: Bell },
   { to: '/studio/quotations', label: 'Quotes', icon: FileText },
   { to: '/studio/payments', label: 'Payments', icon: IndianRupee },
-  { to: '/studio/activity', label: 'Activity', icon: ScrollText, pro: true },
+  { to: '/studio/activity', label: 'Pulse', icon: ScrollText, pro: true },
   { to: '/studio/billing', label: 'Plan', icon: CreditCard },
 ]
 

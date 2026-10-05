@@ -8,7 +8,7 @@ export function SiteFooter() {
         <div>
           <BrandMark />
           <p className="mt-4 max-w-xs text-mute">
-            The studio desk for India’s wedding photographers — leads, quotations, advances and WhatsApp follow-ups.
+            The studio desk for India’s wedding photographers — bookings on Studio, Pulse and the desk chatbot on Pro.
           </p>
         </div>
         <div>

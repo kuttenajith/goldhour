@@ -11,6 +11,7 @@ import { Billing } from './pages/Billing.tsx'
 import { Admin } from './pages/Admin.tsx'
 import { Activity } from './pages/Activity.tsx'
 import { Calendar } from './pages/Calendar.tsx'
+import { PipelineBoard } from './pages/PipelineBoard.tsx'
 import { Forgot, Reset } from './pages/Forgot.tsx'
 import { Dashboard } from './pages/Dashboard.tsx'
 import { Leads } from './pages/Leads.tsx'
@@ -54,6 +55,7 @@ export function App() {
             <Route path="leads/:id" element={<LeadDetail />} />
             <Route path="bookings" element={<Bookings />} />
             <Route path="calendar" element={<Calendar />} />
+            <Route path="pipeline" element={<PipelineBoard />} />
             <Route path="follow-ups" element={<FollowUps />} />
             <Route path="quotations" element={<Quotations />} />
             <Route path="payments" element={<Payments />} />

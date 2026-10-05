@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { ArrowRight, Bell, CalendarClock, FileText, IndianRupee, MessageCircle, Users } from 'lucide-react'
+import { ArrowRight, Bell, CalendarClock, Columns3, FileText, IndianRupee, LayoutDashboard, MessageCircle, Users } from 'lucide-react'
 import { BrandMark } from '../components/BrandMark.tsx'
 import { Button } from '../components/Button.tsx'
 import { SiteFooter } from '../components/SiteFooter.tsx'
@@ -33,12 +33,22 @@ const suite = [
   {
     icon: CalendarClock,
     title: 'Wedding-day timeline',
-    copy: '06:00 getting ready through portraits. The beat sheet the second shooter can follow.',
+    copy: '06:00 getting ready through portraits. The beat sheet the second shooter can follow. Studio Pro.',
+  },
+  {
+    icon: Columns3,
+    title: 'Pipeline + Pulse',
+    copy: 'New → quoted → booked on one board. Win rate, Instagram vs referral, quiet quotes, two Saturdays clashing.',
+  },
+  {
+    icon: LayoutDashboard,
+    title: 'Desk chatbot',
+    copy: 'Padmavathi answers follow-ups, unpaid bookings, date clashes and this morning’s briefing. Studio Pro.',
   },
   {
     icon: MessageCircle,
-    title: 'WhatsApp',
-    copy: 'Ask for date and venue. Send the quote. Remind for payment. Remind for the day.',
+    title: 'WhatsApp desk',
+    copy: 'Ask for date and venue. Send the quote. Remind for payment. Remind for the day. Studio Pro.',
   },
 ]
 
@@ -47,7 +57,7 @@ const prices = [
     name: 'Trial',
     price: '₹0',
     note: '14 days. Your own studio account, on the server.',
-    items: ['Leads and bookings', 'Quotations', 'Follow-ups', 'Payments', 'Calendar, timeline, Padmavathi (14 days)'],
+    items: ['Leads and bookings', 'Quotations', 'Follow-ups', 'Payments', 'Pro extras for 14 days'],
     featured: false,
   },
   {
@@ -60,8 +70,17 @@ const prices = [
   {
     name: 'Studio Pro',
     price: '₹1,500',
-    note: 'The full desk HQ can switch on for a studio.',
-    items: ['Everything in Studio', 'Wedding calendar', 'Day-of timeline', 'WhatsApp desk', 'Padmavathi', 'Activity reports'],
+    note: 'The full wedding CRM HQ can switch on for a studio.',
+    items: [
+      'Everything in Studio',
+      'Calendar + date-clash warnings',
+      'Pipeline board',
+      'Pulse reports',
+      'Day-of timeline',
+      'WhatsApp desk',
+      'Padmavathi chatbot',
+      'Morning briefing in the bell',
+    ],
     featured: false,
   },
 ]
@@ -109,7 +128,7 @@ export function Landing() {
             <span className="block text-gold-soft">Built to run the booking.</span>
           </h1>
           <p className="mx-auto mt-6 max-w-xl text-base text-mute sm:text-lg">
-            Enquiry, quotation, follow-up, advance and the day-of timeline — one desk beside the camera. Built for studios, not for brides.
+            Enquiry, quotation, follow-up, advance — then Pro adds calendar, pipeline, Pulse and the desk chatbot. Built for studios, not for brides.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Link to="/signup">
@@ -132,7 +151,7 @@ export function Landing() {
           />
           <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/20 to-transparent" />
           <figcaption className="absolute bottom-4 left-4 right-4 flex flex-wrap gap-2 sm:bottom-6 sm:left-6">
-            {['Enquiry', 'Quotations', 'Follow-ups', 'Payments'].map((chip) => (
+            {['Enquiry', 'Quotations', 'Pulse', 'Chatbot'].map((chip) => (
               <span key={chip} className="rounded-full border border-gold/35 bg-ink/70 px-3 py-1 text-xs uppercase tracking-wider text-gold-soft backdrop-blur">
                 {chip}
               </span>
@@ -252,7 +271,7 @@ export function Landing() {
           <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-gold">Pricing</p>
           <h2 className="mt-4 font-display text-4xl sm:text-5xl">Fourteen days free. Then the studio pays.</h2>
           <p className="mt-4 max-w-xl text-mute">
-            Create an account, run real bookings, pay ₹999 / month when the trial ends. Razorpay checkout is in the desk.
+            Create an account, run real bookings, pay ₹999 / month when the trial ends. Studio Pro is ₹1,500 for calendar, pipeline, Pulse and Padmavathi.
           </p>
           <div className="mt-12 grid gap-5 lg:grid-cols-3">
             {prices.map((p) => (

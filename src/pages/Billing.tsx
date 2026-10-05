@@ -26,8 +26,17 @@ const plans = [
     id: 'studio_pro',
     name: 'Studio Pro',
     price: '₹1,500',
-    note: 'Studio plus calendar, day-of timeline, WhatsApp desk, Padmavathi and reports.',
-    items: ['Everything in Studio', 'Wedding calendar', 'Day-of timeline', 'WhatsApp templates', 'Padmavathi', 'Activity reports'],
+    note: 'Studio plus the CRM layer: calendar, pipeline, Pulse, chatbot, WhatsApp desk.',
+    items: [
+      'Everything in Studio',
+      'Wedding calendar + date clashes',
+      'Pipeline board',
+      'Pulse reports',
+      'Day-of timeline',
+      'WhatsApp templates',
+      'Padmavathi chatbot',
+      'Morning briefing in the bell',
+    ],
   },
 ]
 

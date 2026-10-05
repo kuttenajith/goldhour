@@ -7,6 +7,8 @@ import { paidOf } from '../lib/booking.ts'
 import { dayPlan } from '../lib/dayPlan.ts'
 import { firstName } from '../lib/copilot.ts'
 import { day, money, paid, timeOfDayGreeting, todayIso } from '../lib/format.ts'
+import { hasProDesk } from '../lib/planAccess.ts'
+import { conversion, dateClashes, staleQuotes } from '../lib/studioPulse.ts'
 import { useStudio } from '../lib/store.ts'
 import { clsx } from '../lib/clsx.ts'
 
@@ -25,6 +27,9 @@ export function Dashboard() {
     .reduce((s, l) => s + Math.max(0, l.packageAmount - paid(l)), 0)
   const priya = leads.find((l) => l.coupleName.startsWith('Priya'))
   const plan = dayPlan(leads)
+  const stats = conversion(leads)
+  const clashes = dateClashes(leads).length
+  const quiet = staleQuotes(leads).length
 
   return (
     <div className="page-rise space-y-6">
@@ -59,6 +64,28 @@ export function Dashboard() {
           </article>
         ))}
       </div>
+
+      {hasProDesk(snap) ? (
+        <Link to="/studio/activity" className="grid gap-3 sm:grid-cols-3">
+          {[
+            ['Win rate', stats.decided ? `${stats.rate}%` : '—'],
+            ['Date clashes', String(clashes)],
+            ['Quiet quotes', String(quiet)],
+          ].map(([k, v]) => (
+            <article key={k} className="rounded-2xl border border-gold/35 bg-ink-2 p-4">
+              <p className="text-[11px] uppercase tracking-[0.16em] text-mute">{k}</p>
+              <p className="mt-2 font-display text-2xl tabular-nums text-gold-soft sm:text-3xl">{v}</p>
+            </article>
+          ))}
+        </Link>
+      ) : (
+        <Link
+          to="/studio/billing"
+          className="block rounded-2xl border border-gold/35 bg-gold/8 px-4 py-3 text-sm text-gold-soft"
+        >
+          Studio Pro adds Pulse, pipeline, calendar clashes and Padmavathi the desk chatbot.
+        </Link>
+      )}
 
       <article className="rounded-2xl border border-line bg-ink-2 p-4 sm:p-5">
         <p className="text-[11px] uppercase tracking-[0.16em] text-mute">Next actions</p>

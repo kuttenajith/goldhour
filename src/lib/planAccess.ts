@@ -43,9 +43,11 @@ export const STUDIO_FEATURES = [
 
 export const PRO_FEATURES = [
   'Everything in Studio',
-  'Wedding calendar',
+  'Wedding calendar with date-clash warnings',
+  'Pipeline board (New → Booked)',
+  'Pulse: win rate, source mix, quiet quotes',
   'Day-of timeline',
   'WhatsApp desk templates',
-  'Padmavathi',
-  'Activity reports',
+  'Padmavathi desk chatbot',
+  'Pro notifications: clashes, stale quotes, morning briefing',
 ]

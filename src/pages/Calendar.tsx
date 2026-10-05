@@ -4,6 +4,7 @@ import { PageHeader } from '../components/PageHeader.tsx'
 import { UpgradeGate } from '../components/UpgradeGate.tsx'
 import { day, money } from '../lib/format.ts'
 import { hasProDesk } from '../lib/planAccess.ts'
+import { dateClashes } from '../lib/studioPulse.ts'
 import { useStudio } from '../lib/store.ts'
 import { clsx } from '../lib/clsx.ts'
 
@@ -43,6 +44,8 @@ export function Calendar() {
     return { y: n.getFullYear(), m: n.getMonth() }
   })
   const days = useMemo(() => monthMatrix(cursor.y, cursor.m), [cursor])
+  const clashes = useMemo(() => dateClashes(leads), [leads])
+  const clashDates = useMemo(() => new Set(clashes.map((c) => c.date)), [clashes])
   const byDate = useMemo(() => {
     const map = new Map<string, typeof leads>()
     for (const lead of leads) {
@@ -62,6 +65,7 @@ export function Calendar() {
       <PageHeader
         kicker="Calendar"
         title={label}
+        hint="Booked Saturdays on one month. GoldHour flags two couples on the same date so you do not double-book the crew."
         actions={
           <div className="flex gap-2">
             <button type="button" className="rounded-full border border-line px-3 py-1.5 text-sm text-mute" onClick={() => setCursor((c) => ({ y: c.m === 0 ? c.y - 1 : c.y, m: c.m === 0 ? 11 : c.m - 1 }))}>
@@ -87,8 +91,16 @@ export function Calendar() {
               const key = iso(d)
               const events = byDate.get(key) || []
               const inMonth = d.getMonth() === cursor.m
+              const clash = clashDates.has(key)
               return (
-                <div key={key} className={clsx('min-h-14 overflow-hidden rounded-xl border border-line p-1.5 text-left sm:min-h-[88px] sm:rounded-2xl sm:p-2', !inMonth && 'opacity-40')}>
+                <div
+                  key={key}
+                  className={clsx(
+                    'min-h-14 overflow-hidden rounded-xl border p-1.5 text-left sm:min-h-[88px] sm:rounded-2xl sm:p-2',
+                    clash ? 'border-gold/70 bg-gold/10' : 'border-line',
+                    !inMonth && 'opacity-40',
+                  )}
+                >
                   <p className="text-xs tabular-nums text-mute">{d.getDate()}</p>
                   <ul className="mt-1 space-y-1">
                     {events.slice(0, 2).map((l) => (
@@ -105,6 +117,18 @@ export function Calendar() {
           </div>
         </div>
       </div>
+      {clashes.length > 0 ? (
+        <article className="rounded-2xl border border-gold/50 bg-gold/10 p-4 text-sm">
+          <p className="text-[11px] uppercase tracking-[0.16em] text-gold-soft">Date clashes</p>
+          <ul className="mt-2 space-y-1">
+            {clashes.map((clash) => (
+              <li key={clash.date}>
+                {day(clash.date)} · {clash.leads.map((l) => l.coupleName).join(' · ')}
+              </li>
+            ))}
+          </ul>
+        </article>
+      ) : null}
       <ul className="space-y-2 text-sm text-mute">
         {leads
           .filter((l) => l.status === 'booked' || l.status === 'accepted')

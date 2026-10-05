@@ -1,5 +1,6 @@
 import { outstanding, paidOf } from '../src/lib/booking.ts'
 import type { AppNotice, Lead } from '../src/lib/types.ts'
+import { dateClashes, morningBrief, staleQuotes } from '../src/lib/studioPulse.ts'
 import { pendingPlanRequest, planTitle } from './planRequests.ts'
 import type { AuditRow, TenantPublic } from './db.ts'
 import { DEMO_EMAIL, isAdminEmail } from './constants.ts'
@@ -52,7 +53,7 @@ function hqHref(email?: string) {
   return `/admin?studio=${encodeURIComponent(email)}`
 }
 
-function liveStudio(leads: Lead[], billing: { status: string; trialEndsOn: string }): AppNotice[] {
+function liveStudio(leads: Lead[], billing: { status: string; trialEndsOn: string }, pro: boolean): AppNotice[] {
   const today = todayIso()
   const items: AppNotice[] = []
   if (!leads.length) {
@@ -117,6 +118,39 @@ function liveStudio(leads: Lead[], billing: { status: string; trialEndsOn: strin
       })
     }
   }
+  if (pro) {
+    const brief = morningBrief(leads, today)
+    if (brief.follow || brief.clashes || brief.stale || brief.unpaid) {
+      items.push({
+        id: `brief:${today}`,
+        title: 'Morning briefing',
+        body: `${brief.follow} follow-ups · ${brief.clashes} date clashes · ${brief.stale} quiet quotes`,
+        href: '/studio/activity',
+        at: `${today}T06:00:00.000Z`,
+        sticky: true,
+      })
+    }
+    for (const clash of dateClashes(leads)) {
+      items.push({
+        id: `clash:${clash.date}`,
+        title: `Date clash · ${clash.date}`,
+        body: clash.leads.map((l) => l.coupleName).join(' · '),
+        href: '/studio/calendar',
+        at: `${clash.date}T00:00:00.000Z`,
+        sticky: true,
+      })
+    }
+    for (const lead of staleQuotes(leads, today)) {
+      items.push({
+        id: `stale:${lead.id}:${lead.nextActionOn || lead.createdOn}`,
+        title: `Quiet quote · ${lead.coupleName}`,
+        body: 'No yes for 3+ days. Send the follow-up from WhatsApp desk.',
+        href: `/studio/leads/${lead.id}`,
+        at: lead.nextActionOn || lead.createdOn || today,
+        sticky: true,
+      })
+    }
+  }
   if (billing.status === 'trialing' && billing.trialEndsOn) {
     const left = daysBetween(today, billing.trialEndsOn)
     if (left >= 0 && left <= 5) {
@@ -153,8 +187,9 @@ export function studioNotices(opts: {
   leads: Lead[]
   billing: { status: string; trialEndsOn: string }
   audit: AuditRow[]
+  pro?: boolean
 }): AppNotice[] {
-  const live = liveStudio(opts.leads, opts.billing)
+  const live = liveStudio(opts.leads, opts.billing, Boolean(opts.pro))
   const audit = fromAudit(
     opts.audit,
     (row) => studioHref(row.action),
