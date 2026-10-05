@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { LogOut, Shield } from 'lucide-react'
 import { BrandMark } from '../components/BrandMark.tsx'
 import { NoticeBell } from '../components/NoticeBell.tsx'
+import { DeskSession } from '../components/TabGuard.tsx'
 import { SiteVisits } from '../components/SiteVisits.tsx'
 import { StatusPill } from '../components/StatusPill.tsx'
 import { fieldClass } from '../components/Field.tsx'
@@ -252,6 +253,7 @@ export function Admin() {
 
   return (
     <div className="min-h-screen bg-ink text-cream">
+      <DeskSession />
       <header className="flex flex-wrap items-center justify-between gap-4 border-b border-line px-4 py-4 sm:px-8">
         <div className="flex items-center gap-3">
           <BrandMark />

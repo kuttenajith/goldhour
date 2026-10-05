@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { BrandMark } from '../components/BrandMark.tsx'
 import { Button } from '../components/Button.tsx'
 import { NoticeBell } from '../components/NoticeBell.tsx'
+import { DeskSession } from '../components/TabGuard.tsx'
 import { firstName } from '../lib/copilot.ts'
 import { api, acceptSession, useStudio } from '../lib/store.ts'
 import { UserHello } from '../components/UserHello.tsx'
@@ -104,6 +105,7 @@ export function Billing() {
 
   return (
     <div className="min-h-screen bg-ink px-4 py-12 text-cream sm:px-6">
+      <DeskSession />
       <div className="mx-auto max-w-3xl">
         <div className="flex items-center justify-between gap-3">
           <BrandMark />

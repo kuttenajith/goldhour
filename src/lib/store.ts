@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import { normalizeLead } from './booking.ts'
-import { claimTab, isTabStale, releaseTab } from './tabLock.ts'
+import { isTabStale, releaseTab } from './tabLock.ts'
 import type { Lead, Payment, Quotation, StudioProfile, StudioSnapshot } from './types.ts'
 
 const EMPTY: StudioSnapshot = {
@@ -75,7 +75,6 @@ export async function bootSession() {
   try {
     const data = await api<StudioSnapshot>('/api/studio')
     apply({ status: 'in', data: hydrate(data) })
-    claimTab()
   } catch {
     apply({ status: 'guest' })
   }
@@ -124,7 +123,6 @@ export function sessionStatus() {
 
 export function acceptSession(data: StudioSnapshot) {
   apply({ status: 'in', data: hydrate(data) })
-  claimTab()
 }
 
 export function homeAfterAuth(data: StudioSnapshot) {

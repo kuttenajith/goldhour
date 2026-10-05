@@ -42,15 +42,15 @@ export function releaseTab() {
   }
 }
 
+export function isDeskPath(path = typeof window === 'undefined' ? '' : window.location.pathname) {
+  return path.startsWith('/studio') || path.startsWith('/admin')
+}
+
 function lockFrom(otherId: string) {
   if (!otherId || otherId === tabId || stale) return
+  if (!isDeskPath()) return
   stale = true
   emit()
-  try {
-    window.close()
-  } catch {
-    /* browsers only close script-opened tabs */
-  }
 }
 
 let bc: BroadcastChannel | null | undefined

@@ -21,6 +21,7 @@ import { BrandMark } from '../components/BrandMark.tsx'
 import { ThemeToggle } from '../components/ThemeToggle.tsx'
 import { Onboarding } from '../components/Onboarding.tsx'
 import { NoticeBell } from '../components/NoticeBell.tsx'
+import { DeskSession } from '../components/TabGuard.tsx'
 import { UserHello } from '../components/UserHello.tsx'
 import { firstName } from '../lib/copilot.ts'
 import { todayIso } from '../lib/format.ts'
@@ -115,6 +116,7 @@ export function StudioShell() {
 
   return (
     <div className="relative h-dvh max-h-dvh overflow-hidden bg-ink text-cream">
+      <DeskSession />
       <Onboarding />
       <div
         className={clsx(
