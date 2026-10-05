@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Plus, Search } from 'lucide-react'
 import { Button } from '../components/Button.tsx'
 import { LeadForm } from '../components/LeadForm.tsx'
@@ -13,8 +13,22 @@ import type { Lead } from '../lib/types.ts'
 
 export function Leads() {
   const { leads } = useStudio()
+  const [params, setParams] = useSearchParams()
   const [q, setQ] = useState('')
   const [open, setOpen] = useState(false)
+
+  useEffect(() => {
+    if (params.get('new') === '1') setOpen(true)
+  }, [params])
+
+  function closeForm() {
+    setOpen(false)
+    if (params.get('new')) {
+      const next = new URLSearchParams(params)
+      next.delete('new')
+      setParams(next, { replace: true })
+    }
+  }
 
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase()
@@ -26,7 +40,7 @@ export function Leads() {
 
   function save(lead: Lead) {
     upsertLead(lead)
-    setOpen(false)
+    closeForm()
   }
 
   return (
@@ -113,8 +127,8 @@ export function Leads() {
       {filtered.length === 0 ? <p className="text-sm text-mute">No leads match that search.</p> : null}
 
       {open ? (
-        <Modal title="New lead" onClose={() => setOpen(false)}>
-          <LeadForm onSave={save} onCancel={() => setOpen(false)} />
+        <Modal title="New lead" onClose={closeForm}>
+          <LeadForm onSave={save} onCancel={closeForm} />
         </Modal>
       ) : null}
     </div>

@@ -28,6 +28,7 @@ import {
 } from './crypto.ts'
 import { emptyStudio, getStore, type UserRow } from './db.ts'
 import { mailUser } from './mail.ts'
+import { hqNotices, studioNotices } from './notices.ts'
 import {
   notifyCheckout,
   notifyDemoOpened,
@@ -757,6 +758,29 @@ app.post('/billing/webhook', async (c) => {
     }
   }
   return c.json({ ok: true })
+})
+
+app.get('/notices', async (c) => {
+  const actor = await actorFrom(c)
+  if (!actor) return c.json({ error: 'Sign in required' }, 401)
+  const db = getStore()
+  const hq = isAdminEmail(actor.user.email) || actor.user.role === 'hq'
+  if (hq) {
+    const [tenants, audit] = await Promise.all([db.listTenants(), db.listAudit({ limit: 80 })])
+    return c.json({ notices: hqNotices({ tenants, audit }) })
+  }
+  const sub = await db.getSub(actor.user.id)
+  const audit = await db.listAudit({ studioId: actor.studio.id, limit: 40 })
+  return c.json({
+    notices: studioNotices({
+      leads: actor.studio.leads || [],
+      billing: {
+        status: sub ? billingStatus(sub).status : actor.user.email === DEMO_EMAIL ? 'active' : 'trialing',
+        trialEndsOn: sub?.trialEndsOn || '',
+      },
+      audit,
+    }),
+  })
 })
 
 app.get('/admin/overview', async (c) => {

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { LogOut, Shield } from 'lucide-react'
 import { BrandMark } from '../components/BrandMark.tsx'
+import { NoticeBell } from '../components/NoticeBell.tsx'
 import { SiteVisits } from '../components/SiteVisits.tsx'
 import { StatusPill } from '../components/StatusPill.tsx'
 import { fieldClass } from '../components/Field.tsx'
@@ -69,13 +70,16 @@ function LeadBlock({ lead }: { lead: Lead }) {
   )
 }
 
-function StudioCard({ tenant }: { tenant: AdminTenant }) {
-  const [open, setOpen] = useState(false)
+function StudioCard({ tenant, startsOpen }: { tenant: AdminTenant; startsOpen?: boolean }) {
+  const [open, setOpen] = useState(Boolean(startsOpen))
+  useEffect(() => {
+    if (startsOpen) setOpen(true)
+  }, [startsOpen])
   const booked = tenant.leads.filter((l) => l.status === 'booked' || l.status === 'accepted')
   const collected = tenant.leads.reduce((s, l) => s + paid(l), 0)
   const label = tenant.isAdmin ? 'HQ' : tenant.isDemo ? 'Demo' : tenant.billing.status === 'active' ? 'Paying' : tenant.billing.status === 'trialing' ? 'Trial' : 'Expired'
   return (
-    <section className="rounded-3xl border border-line bg-ink-2">
+    <section className="rounded-3xl border border-line bg-ink-2" data-studio={tenant.email}>
       <button type="button" className="flex w-full flex-col gap-3 p-5 text-left sm:flex-row sm:items-center sm:justify-between" onClick={() => setOpen((v) => !v)}>
         <span>
           <span className="block font-display text-2xl">{tenant.studio.name}</span>
@@ -113,6 +117,8 @@ function StudioCard({ tenant }: { tenant: AdminTenant }) {
 export function Admin() {
   const navigate = useNavigate()
   const me = useStudio()
+  const [params] = useSearchParams()
+  const focus = params.get('studio') || ''
   const [data, setData] = useState<AdminOverview | null>(null)
   const [error, setError] = useState('')
   const [q, setQ] = useState('')
@@ -123,6 +129,17 @@ export function Admin() {
       .then(setData)
       .catch((err) => setError(err instanceof Error ? err.message : 'Could not load HQ'))
   }, [])
+
+  useEffect(() => {
+    if (focus) setFilter('all')
+  }, [focus])
+
+  useEffect(() => {
+    if (!focus || !data) return
+    window.setTimeout(() => {
+      document.querySelector(`[data-studio="${CSS.escape(focus)}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 50)
+  }, [focus, data])
 
   const tenants = data?.tenants || []
   const live = tenants.filter((t) => !t.isAdmin && !t.isDemo)
@@ -151,8 +168,9 @@ export function Admin() {
             <Shield size={12} /> HQ
           </span>
         </div>
-        <div className="flex items-center gap-4 text-sm">
-          <span className="text-mute">{me.email || 'ajithkutten1998@gmail.com'}</span>
+        <div className="flex items-center gap-3 text-sm">
+          <NoticeBell />
+          <span className="hidden text-mute sm:inline">{me.email || 'ajithkutten1998@gmail.com'}</span>
           <Link to="/studio" className="text-gold-soft">
             My desk
           </Link>
@@ -236,7 +254,7 @@ export function Admin() {
         <div className="space-y-4">
           {data && shown.length === 0 ? <p className="text-mute">No studios match that filter.</p> : null}
           {shown.map((tenant) => (
-            <StudioCard key={tenant.email} tenant={tenant} />
+            <StudioCard key={tenant.email} tenant={tenant} startsOpen={focus === tenant.email} />
           ))}
         </div>
       </main>

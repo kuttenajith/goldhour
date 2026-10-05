@@ -13,6 +13,7 @@ import {
 import { BrandMark } from '../components/BrandMark.tsx'
 import { ThemeToggle } from '../components/ThemeToggle.tsx'
 import { Onboarding } from '../components/Onboarding.tsx'
+import { NoticeBell } from '../components/NoticeBell.tsx'
 import { todayIso } from '../lib/format.ts'
 import { logoutStudio, useStudio } from '../lib/store.ts'
 import { clsx } from '../lib/clsx.ts'
@@ -92,16 +93,18 @@ export function StudioShell() {
         </aside>
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-          <header className="flex shrink-0 items-center justify-between gap-3 border-b border-line bg-ink-2 px-4 py-2.5 lg:hidden">
-            <BrandMark />
-            <span className="flex min-w-0 items-center gap-3">
+          <header className="flex shrink-0 items-center justify-between gap-3 border-b border-line bg-ink-2 px-4 py-2.5">
+            <div className="flex min-w-0 items-center gap-3 lg:hidden">
+              <BrandMark />
               {isAdmin ? (
                 <Link to="/admin" className="shrink-0 text-xs uppercase tracking-[0.18em] text-gold-soft">
                   HQ
                 </Link>
               ) : null}
               <span className="truncate text-xs uppercase tracking-[0.18em] text-gold-soft">{studio.name}</span>
-            </span>
+            </div>
+            <p className="hidden truncate text-sm text-mute lg:block">{studio.name}</p>
+            <NoticeBell />
           </header>
           <nav className="flex shrink-0 gap-1 overflow-x-auto border-b border-line bg-ink-2 px-3 py-2 lg:hidden">
             {links.map((link) => (

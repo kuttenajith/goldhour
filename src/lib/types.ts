@@ -126,3 +126,12 @@ export interface AdminOverview {
   isAdmin: true
   tenants: AdminTenant[]
 }
+
+export interface AppNotice {
+  id: string
+  title: string
+  body: string
+  href: string
+  at: string
+  sticky?: boolean
+}

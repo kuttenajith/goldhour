@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Check, MessageCircle, Plus } from 'lucide-react'
 import { Button } from '../components/Button.tsx'
 import { Field, fieldBox } from '../components/Field.tsx'
@@ -35,11 +35,26 @@ import type { Lead, Payment, PaymentKind, TimelineSlot } from '../lib/types.ts'
 export function LeadDetail() {
   const { id: leadId } = useParams()
   const navigate = useNavigate()
+  const [params, setParams] = useSearchParams()
   const state = useStudio()
   const lead = state.leads.find((l) => l.id === leadId)
   const [editing, setEditing] = useState(false)
   const [payOpen, setPayOpen] = useState(false)
   const [quoteOpen, setQuoteOpen] = useState(false)
+
+  useEffect(() => {
+    const open = params.get('open')
+    if (open === 'pay') setPayOpen(true)
+    if (open === 'quote') setQuoteOpen(true)
+    if (open === 'edit') setEditing(true)
+  }, [leadId, params])
+
+  function clearOpen() {
+    if (!params.get('open')) return
+    const next = new URLSearchParams(params)
+    next.delete('open')
+    setParams(next, { replace: true })
+  }
 
   if (!lead) {
     return (
@@ -235,24 +250,38 @@ export function LeadDetail() {
       </button>
 
       {editing ? (
-        <Modal title="Edit enquiry" onClose={() => setEditing(false)}>
+        <Modal
+          title="Edit enquiry"
+          onClose={() => {
+            setEditing(false)
+            clearOpen()
+          }}
+        >
           <LeadForm
             initial={lead}
             onSave={(next) => {
               upsertLead(next)
               setEditing(false)
+              clearOpen()
             }}
-            onCancel={() => setEditing(false)}
+            onCancel={() => {
+              setEditing(false)
+              clearOpen()
+            }}
           />
         </Modal>
       ) : null}
 
       {payOpen ? (
         <PaymentModal
-          onClose={() => setPayOpen(false)}
+          onClose={() => {
+            setPayOpen(false)
+            clearOpen()
+          }}
           onSave={(payment) => {
             addPayment(lead.id, payment)
             setPayOpen(false)
+            clearOpen()
           }}
         />
       ) : null}
@@ -260,7 +289,10 @@ export function LeadDetail() {
       {quoteOpen ? (
         <QuoteModal
           lead={lead}
-          onClose={() => setQuoteOpen(false)}
+          onClose={() => {
+            setQuoteOpen(false)
+            clearOpen()
+          }}
           onSave={(packageName, amount, notes) => {
             const quote = {
               id: id(),
@@ -281,6 +313,7 @@ export function LeadDetail() {
             })
             downloadQuotation(state.studio, { ...lead, packageAmount: amount, plan: splitPlan(amount) }, quote)
             setQuoteOpen(false)
+            clearOpen()
           }}
         />
       ) : null}
