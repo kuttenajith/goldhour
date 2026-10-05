@@ -43,6 +43,12 @@ export function Padmavathi() {
   }, [authed, snap?.isAdmin])
 
   useEffect(() => {
+    const desk =
+      location.pathname.startsWith('/studio') || location.pathname.startsWith('/admin')
+    if (!desk) setOpen(false)
+  }, [location.pathname])
+
+  useEffect(() => {
     if (!open) return
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') setOpen(false)
@@ -51,7 +57,10 @@ export function Padmavathi() {
     return () => document.removeEventListener('keydown', onKey)
   }, [open])
 
-  if (!authed || !snap || stale) return null
+  const onDesk =
+    location.pathname.startsWith('/studio') || location.pathname.startsWith('/admin')
+
+  if (!authed || !snap || stale || !onDesk) return null
 
   const desk = snap
   const chips = desk.isAdmin ? hqChips : deskChips
