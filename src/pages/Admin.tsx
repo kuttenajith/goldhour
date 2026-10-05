@@ -13,7 +13,14 @@ import { UserHello } from '../components/UserHello.tsx'
 import type { AdminOverview, AdminTenant, Lead } from '../lib/types.ts'
 import { clsx } from '../lib/clsx.ts'
 
-type Filter = 'live' | 'paying' | 'trial' | 'all'
+type Filter = 'live' | 'paying' | 'trial' | 'request' | 'all'
+
+function planName(id?: string | null) {
+  if (id === 'studio_pro') return 'Studio Pro'
+  if (id === 'studio') return 'Studio'
+  if (id === 'trial') return 'Trial'
+  return id || '—'
+}
 
 function kind(t: AdminTenant): Filter | 'hq' | 'demo' {
   if (t.isAdmin) return 'hq'
@@ -81,15 +88,17 @@ function StudioCard({
   startsOpen?: boolean
   onRefresh?: () => void
 }) {
-  const [open, setOpen] = useState(Boolean(startsOpen))
+  const [open, setOpen] = useState(Boolean(startsOpen) || Boolean(tenant.billing.requestedPlan))
   const [planBusy, setPlanBusy] = useState<string | null>(null)
   useEffect(() => {
-    if (startsOpen) setOpen(true)
-  }, [startsOpen])
+    if (startsOpen || tenant.billing.requestedPlan) setOpen(true)
+  }, [startsOpen, tenant.billing.requestedPlan])
   const booked = tenant.leads.filter((l) => l.status === 'booked' || l.status === 'accepted')
   const collected = tenant.leads.reduce((s, l) => s + paid(l), 0)
   const label = tenant.isAdmin ? 'HQ' : tenant.isDemo ? 'Demo' : tenant.billing.status === 'active' ? 'Paying' : tenant.billing.status === 'trialing' ? 'Trial' : 'Expired'
-  const canActivate = !tenant.isAdmin && !tenant.isDemo && tenant.billing.status !== 'active'
+  const canSwitch = !tenant.isAdmin && !tenant.isDemo
+  const current = tenant.billing.status === 'active' ? tenant.billing.plan : tenant.billing.status === 'trialing' ? 'trial' : tenant.billing.plan
+  const requested = tenant.billing.requestedPlan
 
   async function activate(plan: 'studio' | 'studio_pro') {
     setPlanBusy(plan)
@@ -110,6 +119,11 @@ function StudioCard({
           </span>
         </span>
         <span className="flex flex-wrap items-center gap-3 text-sm">
+          {requested ? (
+            <span className="rounded-full bg-gold px-3 py-1 text-xs uppercase tracking-wider text-ink">
+              Wants {planName(requested)}
+            </span>
+          ) : null}
           <span className="rounded-full border border-gold/35 px-3 py-1 text-xs uppercase tracking-wider text-gold-soft">{label}</span>
           <span className="tabular-nums text-gold-soft">{tenant.leads.length} events</span>
           <span className="tabular-nums">{money(collected)}</span>
@@ -118,27 +132,39 @@ function StudioCard({
       {open ? (
         <div className="space-y-4 border-t border-line p-5">
           <p className="text-sm text-mute">
-            Phone {tenant.studio.phone || '—'} · Plan {tenant.billing.plan} · Trial until {tenant.billing.trialEndsOn || '—'}
+            Phone {tenant.studio.phone || '—'} · Plan {planName(current)} · Trial until {tenant.billing.trialEndsOn || '—'}
             {tenant.billing.periodEndsOn ? ` · Paid through ${tenant.billing.periodEndsOn}` : ''}
           </p>
-          {canActivate ? (
+          {requested ? (
+            <p className="rounded-xl border border-gold/40 bg-gold/10 px-4 py-3 text-sm text-gold-soft">
+              {tenant.email} asked to switch to {planName(requested)}. Approve below.
+            </p>
+          ) : null}
+          {canSwitch ? (
             <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                className="rounded-full border border-gold/35 px-3 py-1.5 text-xs text-gold-soft disabled:opacity-50"
-                disabled={planBusy !== null}
-                onClick={() => void activate('studio')}
-              >
-                {planBusy === 'studio' ? 'Starting…' : 'Start Studio now'}
-              </button>
-              <button
-                type="button"
-                className="rounded-full border border-gold/35 px-3 py-1.5 text-xs text-gold-soft disabled:opacity-50"
-                disabled={planBusy !== null}
-                onClick={() => void activate('studio_pro')}
-              >
-                {planBusy === 'studio_pro' ? 'Starting…' : 'Start Pro now'}
-              </button>
+              {current !== 'studio' ? (
+                <button
+                  type="button"
+                  className="cursor-pointer rounded-full border border-gold/35 px-3 py-1.5 text-xs text-gold-soft disabled:opacity-50"
+                  disabled={planBusy !== null}
+                  onClick={() => void activate('studio')}
+                >
+                  {planBusy === 'studio' ? 'Switching…' : requested === 'studio' ? 'Approve Studio' : 'Switch to Studio'}
+                </button>
+              ) : null}
+              {current !== 'studio_pro' ? (
+                <button
+                  type="button"
+                  className={clsx(
+                    'cursor-pointer rounded-full px-3 py-1.5 text-xs disabled:opacity-50',
+                    requested === 'studio_pro' ? 'bg-gold text-ink' : 'border border-gold/35 text-gold-soft',
+                  )}
+                  disabled={planBusy !== null}
+                  onClick={() => void activate('studio_pro')}
+                >
+                  {planBusy === 'studio_pro' ? 'Switching…' : requested === 'studio_pro' ? 'Approve Pro' : 'Switch to Pro'}
+                </button>
+              ) : null}
             </div>
           ) : null}
           <p className="text-xs uppercase tracking-[0.2em] text-mute">
@@ -165,6 +191,7 @@ export function Admin() {
   const [error, setError] = useState('')
   const [q, setQ] = useState('')
   const [filter, setFilter] = useState<Filter>('live')
+  const [autoOpenedRequests, setAutoOpenedRequests] = useState(false)
 
   function loadHq() {
     api<AdminOverview>('/api/admin/overview')
@@ -181,6 +208,14 @@ export function Admin() {
   }, [focus])
 
   useEffect(() => {
+    if (!data || autoOpenedRequests || focus) return
+    if (data.tenants.some((t) => t.billing.requestedPlan && !t.isAdmin && !t.isDemo)) {
+      setFilter('request')
+      setAutoOpenedRequests(true)
+    }
+  }, [data, autoOpenedRequests, focus])
+
+  useEffect(() => {
     if (!focus || !data) return
     window.setTimeout(() => {
       document.querySelector(`[data-studio="${CSS.escape(focus)}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -191,6 +226,7 @@ export function Admin() {
   const live = tenants.filter((t) => !t.isAdmin && !t.isDemo)
   const paying = live.filter((t) => t.billing.status === 'active')
   const trial = live.filter((t) => t.billing.status === 'trialing')
+  const requests = live.filter((t) => Boolean(t.billing.requestedPlan))
   const events = live.reduce((s, t) => s + t.leads.length, 0)
 
   const shown = useMemo(() => {
@@ -199,6 +235,7 @@ export function Admin() {
       if (filter === 'live' && (t.isAdmin || t.isDemo)) return false
       if (filter === 'paying' && kind(t) !== 'paying') return false
       if (filter === 'trial' && kind(t) !== 'trial') return false
+      if (filter === 'request' && !t.billing.requestedPlan) return false
       if (!needle) return true
       const blob = [t.email, t.studio.name, t.studio.owner, t.studio.city, ...t.leads.map((l) => l.coupleName)].join(' ').toLowerCase()
       return blob.includes(needle)
@@ -242,17 +279,28 @@ export function Admin() {
           </p>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          {[
-            ['Studios', String(live.length)],
-            ['Paying', String(paying.length)],
-            ['On trial', String(trial.length)],
-            ['Events on file', String(events)],
-          ].map(([k, v]) => (
-            <article key={k} className="rounded-2xl border border-line bg-ink-2 p-4">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          {(
+            [
+              ['Studios', String(live.length), 'live' as Filter],
+              ['Paying', String(paying.length), 'paying' as Filter],
+              ['On trial', String(trial.length), 'trial' as Filter],
+              ['Plan requests', String(requests.length), 'request' as Filter],
+              ['Events on file', String(events), 'live' as Filter],
+            ] as const
+          ).map(([k, v, next]) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => setFilter(next)}
+              className={clsx(
+                'rounded-2xl border bg-ink-2 p-4 text-left',
+                k === 'Plan requests' && requests.length > 0 ? 'border-gold/50' : 'border-line',
+              )}
+            >
               <p className="text-[11px] uppercase tracking-[0.18em] text-mute">{k}</p>
               <p className="mt-2 font-display text-2xl tabular-nums text-gold-soft sm:text-3xl">{v}</p>
-            </article>
+            </button>
           ))}
           <article className="rounded-2xl border border-line bg-ink-2 p-4">
             <p className="text-[11px] uppercase tracking-[0.18em] text-mute">Site visits</p>
@@ -274,6 +322,7 @@ export function Admin() {
             {(
               [
                 ['live', 'Live studios'],
+                ['request', 'Plan requests'],
                 ['paying', 'Paying'],
                 ['trial', 'Trial'],
                 ['all', 'All including demo'],
@@ -300,7 +349,12 @@ export function Admin() {
         <div className="space-y-4">
           {data && shown.length === 0 ? <p className="text-mute">No studios match that filter.</p> : null}
           {shown.map((tenant) => (
-            <StudioCard key={tenant.email} tenant={tenant} startsOpen={focus === tenant.email} onRefresh={loadHq} />
+            <StudioCard
+              key={tenant.email}
+              tenant={tenant}
+              startsOpen={focus === tenant.email || Boolean(tenant.billing.requestedPlan)}
+              onRefresh={loadHq}
+            />
           ))}
         </div>
       </main>

@@ -68,6 +68,7 @@ export type SubRow = {
   trialEndsOn: string
   periodEndsOn: string | null
   razorpayPaymentId: string | null
+  requestedPlan: string | null
 }
 
 export type OrderRow = {
@@ -111,7 +112,7 @@ export type Store = {
   createToken(row: TokenRow): Promise<void>
   consumeToken(kind: TokenRow['kind'], tokenHash: string): Promise<TokenRow | null>
   insertAudit(row: AuditRow): Promise<void>
-  listAudit(opts: { studioId?: string; limit?: number }): Promise<AuditRow[]>
+  listAudit(opts: { studioId?: string; limit?: number; actionPrefix?: string }): Promise<AuditRow[]>
 }
 
 function mapUser(row: Partial<UserRow> & { id: string; email: string; passwordHash?: string; password_hash?: string; createdAt?: string; created_at?: string; emailVerifiedAt?: string | null; email_verified_at?: string | null; role?: string }): UserRow {
@@ -156,6 +157,15 @@ function emptyStudio(userId: string, profile: Partial<StudioProfile> & { name: s
   }
 }
 
+function mapSub(row: SubRow): SubRow {
+  return {
+    ...row,
+    trialEndsOn: String(row.trialEndsOn || '').slice(0, 10),
+    periodEndsOn: row.periodEndsOn ? String(row.periodEndsOn).slice(0, 10) : null,
+    requestedPlan: row.requestedPlan || null,
+  }
+}
+
 async function seedDemo(store: Store) {
   const existing = await store.findUserByEmail(DEMO_EMAIL)
   if (existing) return existing
@@ -188,6 +198,7 @@ async function seedDemo(store: Store) {
     trialEndsOn: '2099-12-31',
     periodEndsOn: null,
     razorpayPaymentId: null,
+    requestedPlan: null,
   })
   return user
 }
@@ -259,7 +270,8 @@ function fileStore(path: string): Store {
       write(db)
     },
     async getSub(userId) {
-      return read().subs.find((s) => s.userId === userId) ?? null
+      const row = read().subs.find((s) => s.userId === userId)
+      return row ? mapSub(row) : null
     },
     async upsertSub(sub) {
       const db = read()
@@ -286,12 +298,12 @@ function fileStore(path: string): Store {
         sub.plan = order.plan
         sub.status = 'active'
         sub.razorpayPaymentId = paymentId
+        sub.requestedPlan = null
         const start = sub.periodEndsOn && sub.periodEndsOn > new Date().toISOString().slice(0, 10)
           ? sub.periodEndsOn
           : new Date().toISOString().slice(0, 10)
-        const days = order.plan === 'studio_pro' ? 30 : 30
         const d = new Date(`${start}T00:00:00.000Z`)
-        d.setUTCDate(d.getUTCDate() + days)
+        d.setUTCDate(d.getUTCDate() + 30)
         sub.periodEndsOn = d.toISOString().slice(0, 10)
       }
       write(db)
@@ -304,7 +316,10 @@ function fileStore(path: string): Store {
       return db.users.map((user) => ({
         user: publicUser(user),
         studio: db.studios.find((s) => s.userId === user.id) ?? null,
-        sub: db.subs.find((s) => s.userId === user.id) ?? null,
+        sub: (() => {
+          const row = db.subs.find((s) => s.userId === user.id)
+          return row ? mapSub(row) : null
+        })(),
       }))
     },
     async updatePassword(userId, passwordHash) {
@@ -377,8 +392,14 @@ function fileStore(path: string): Store {
       write(db)
     },
     async listAudit(opts) {
-      const rows = read().audit.filter((r) => (opts.studioId ? r.studioId === opts.studioId : true))
-      return rows.slice(0, opts.limit ?? 80)
+      const limit = Math.min(Math.max(opts.limit ?? 80, 1), 500)
+      return read()
+        .audit.filter((r) => {
+          if (opts.studioId && r.studioId !== opts.studioId) return false
+          if (opts.actionPrefix && !r.action.startsWith(opts.actionPrefix)) return false
+          return true
+        })
+        .slice(0, limit)
     },
   }
   return store
@@ -417,8 +438,10 @@ function postgresStore(url: string): Store {
         status text NOT NULL,
         trial_ends_on date NOT NULL,
         period_ends_on date,
-        razorpay_payment_id text
+        razorpay_payment_id text,
+        requested_plan text
       )`
+      await sql`ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS requested_plan text`
       await sql`CREATE TABLE IF NOT EXISTS billing_orders (
         id text PRIMARY KEY,
         user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -501,24 +524,20 @@ function postgresStore(url: string): Store {
           quotations = excluded.quotations`
     },
     async getSub(userId) {
-      const rows = await sql`SELECT user_id AS "userId", plan, status, trial_ends_on::text AS "trialEndsOn", period_ends_on::text AS "periodEndsOn", razorpay_payment_id AS "razorpayPaymentId" FROM subscriptions WHERE user_id = ${userId}`
+      const rows = await sql`SELECT user_id AS "userId", plan, status, trial_ends_on::text AS "trialEndsOn", period_ends_on::text AS "periodEndsOn", razorpay_payment_id AS "razorpayPaymentId", requested_plan AS "requestedPlan" FROM subscriptions WHERE user_id = ${userId}`
       const row = rows[0] as SubRow | undefined
-      if (!row) return null
-      return {
-        ...row,
-        trialEndsOn: String(row.trialEndsOn).slice(0, 10),
-        periodEndsOn: row.periodEndsOn ? String(row.periodEndsOn).slice(0, 10) : null,
-      }
+      return row ? mapSub(row) : null
     },
     async upsertSub(sub) {
-      await sql`INSERT INTO subscriptions (user_id, plan, status, trial_ends_on, period_ends_on, razorpay_payment_id)
-        VALUES (${sub.userId}, ${sub.plan}, ${sub.status}, ${sub.trialEndsOn}, ${sub.periodEndsOn}, ${sub.razorpayPaymentId})
+      await sql`INSERT INTO subscriptions (user_id, plan, status, trial_ends_on, period_ends_on, razorpay_payment_id, requested_plan)
+        VALUES (${sub.userId}, ${sub.plan}, ${sub.status}, ${sub.trialEndsOn}, ${sub.periodEndsOn}, ${sub.razorpayPaymentId}, ${sub.requestedPlan || null})
         ON CONFLICT (user_id) DO UPDATE SET
           plan = excluded.plan,
           status = excluded.status,
           trial_ends_on = excluded.trial_ends_on,
           period_ends_on = excluded.period_ends_on,
-          razorpay_payment_id = excluded.razorpay_payment_id`
+          razorpay_payment_id = excluded.razorpay_payment_id,
+          requested_plan = excluded.requested_plan`
     },
     async insertOrder(order) {
       await sql`INSERT INTO billing_orders (id, user_id, razorpay_order_id, plan, amount, status, created_at)
@@ -543,6 +562,7 @@ function postgresStore(url: string): Store {
         plan: order.plan,
         status: 'active',
         razorpayPaymentId: paymentId,
+        requestedPlan: null,
         periodEndsOn: d.toISOString().slice(0, 10),
       })
     },
@@ -552,18 +572,9 @@ function postgresStore(url: string): Store {
     async listTenants() {
       const users = await sql`SELECT id, email, created_at AS "createdAt" FROM users ORDER BY created_at DESC`
       const studios = await sql`SELECT id, user_id AS "userId", name, owner, city, phone, tagline, onboarded, leads, quotations FROM studios`
-      const subs = await sql`SELECT user_id AS "userId", plan, status, trial_ends_on::text AS "trialEndsOn", period_ends_on::text AS "periodEndsOn", razorpay_payment_id AS "razorpayPaymentId" FROM subscriptions`
+      const subs = await sql`SELECT user_id AS "userId", plan, status, trial_ends_on::text AS "trialEndsOn", period_ends_on::text AS "periodEndsOn", razorpay_payment_id AS "razorpayPaymentId", requested_plan AS "requestedPlan" FROM subscriptions`
       const studioByUser = new Map((studios as StudioRow[]).map((s) => [s.userId, s]))
-      const subByUser = new Map(
-        (subs as SubRow[]).map((s) => [
-          s.userId,
-          {
-            ...s,
-            trialEndsOn: sliceDate(s.trialEndsOn) || s.trialEndsOn,
-            periodEndsOn: sliceDate(s.periodEndsOn),
-          },
-        ]),
-      )
+      const subByUser = new Map((subs as SubRow[]).map((s) => [s.userId, mapSub(s)]))
       return (users as { id: string; email: string; createdAt: string }[]).map((user) => ({
         user: publicUser(user as UserRow),
         studio: studioByUser.get(user.id) ?? null,
@@ -625,9 +636,15 @@ function postgresStore(url: string): Store {
         VALUES (${row.id}, ${row.studioId}, ${row.userId}, ${row.action}, ${row.detail}, ${row.ip}, ${row.createdAt})`
     },
     async listAudit(opts) {
+      const limit = Math.min(Math.max(opts.limit ?? 80, 1), 500)
+      const prefix = opts.actionPrefix ? `${opts.actionPrefix}%` : null
       const rows = opts.studioId
-        ? await sql`SELECT id, studio_id AS "studioId", user_id AS "userId", action, detail, ip, created_at AS "createdAt" FROM audit_events WHERE studio_id = ${opts.studioId} ORDER BY created_at DESC LIMIT 80`
-        : await sql`SELECT id, studio_id AS "studioId", user_id AS "userId", action, detail, ip, created_at AS "createdAt" FROM audit_events ORDER BY created_at DESC LIMIT 80`
+        ? prefix
+          ? await sql`SELECT id, studio_id AS "studioId", user_id AS "userId", action, detail, ip, created_at AS "createdAt" FROM audit_events WHERE studio_id = ${opts.studioId} AND action LIKE ${prefix} ORDER BY created_at DESC LIMIT ${limit}`
+          : await sql`SELECT id, studio_id AS "studioId", user_id AS "userId", action, detail, ip, created_at AS "createdAt" FROM audit_events WHERE studio_id = ${opts.studioId} ORDER BY created_at DESC LIMIT ${limit}`
+        : prefix
+          ? await sql`SELECT id, studio_id AS "studioId", user_id AS "userId", action, detail, ip, created_at AS "createdAt" FROM audit_events WHERE action LIKE ${prefix} ORDER BY created_at DESC LIMIT ${limit}`
+          : await sql`SELECT id, studio_id AS "studioId", user_id AS "userId", action, detail, ip, created_at AS "createdAt" FROM audit_events ORDER BY created_at DESC LIMIT ${limit}`
       return (rows as AuditRow[]).map((r) => ({ ...r, createdAt: String(r.createdAt) }))
     },
   }

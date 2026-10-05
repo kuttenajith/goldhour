@@ -1,6 +1,6 @@
 import type { Lead, Quotation, StudioProfile } from '../src/lib/types.ts'
 import { day, money, PAYMENT_LABEL, SERVICE_LABEL, SOURCE_LABEL, STATUS_LABEL } from '../src/lib/format.ts'
-import { isAdminEmail } from './constants.ts'
+import { APP_URL, isAdminEmail } from './constants.ts'
 import { mailAdmin, mailUser } from './mail.ts'
 import { demoFollowLetter, trialWelcomeLetter } from './letters.ts'
 
@@ -195,6 +195,35 @@ export async function notifyLeadChanges(opts: {
 
   const headline = added[0]?.coupleName || changed[0]?.coupleName || removed[0]?.coupleName || opts.studio.name
   await notifyHq(`[GOLDHOUR EVENT] ${opts.studio.name} · ${headline}`, blocks.join('\n'), opts.email)
+}
+
+export async function notifyPlanRequest(opts: {
+  email: string
+  studio: StudioProfile
+  plan: string
+  current: string
+}) {
+  if (isAdminEmail(opts.email)) return
+  const want = opts.plan === 'studio_pro' ? 'Studio Pro' : 'Studio'
+  await notifyHq(
+    `[GOLDHOUR REQUEST] ${opts.studio.name} asked for ${want}`,
+    block(opts.studio, opts.email, [
+      `They asked HQ to switch the desk to ${want}.`,
+      `Current plan: ${opts.current}`,
+      `Open HQ and tap Switch to ${want}: ${APP_URL}/admin?studio=${encodeURIComponent(opts.email)}`,
+    ]),
+    opts.email,
+  )
+}
+
+export async function notifyPlanApproved(studio: StudioProfile, email: string, plan: string) {
+  if (isAdminEmail(email)) return
+  const name = plan === 'studio_pro' ? 'Studio Pro' : 'Studio'
+  await notifyHq(
+    `[GOLDHOUR APPROVED] ${studio.name} is now on ${name}`,
+    block(studio, email, [`HQ switched this desk to ${name}.`]),
+    email,
+  )
 }
 
 export async function notifyPaid(studio: StudioProfile, email: string, plan: string, amountPaise: number) {

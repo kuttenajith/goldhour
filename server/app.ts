@@ -26,7 +26,7 @@ import {
   verifyPassword,
   webhookSignature,
 } from './crypto.ts'
-import { emptyStudio, getStore, type UserRow } from './db.ts'
+import { emptyStudio, getStore, type AuditRow, type UserRow } from './db.ts'
 import { mailUser } from './mail.ts'
 import { hqNotices, studioNotices } from './notices.ts'
 import {
@@ -35,10 +35,13 @@ import {
   notifyLeadChanges,
   notifyLogin,
   notifyPaid,
+  notifyPlanApproved,
+  notifyPlanRequest,
   notifySimple,
   notifyStudioSignup,
   notifyTrialWelcome,
 } from './notify.ts'
+import { pendingPlanRequest } from './planRequests.ts'
 import { PLANS, addDays, billingStatus, todayIso, trialEnd, type PaidPlanId } from './plans.ts'
 import { emailOk, passwordOk, studioPayloadTooLarge, validateLeads, validateQuotations, validateStudioProfile } from './validate.ts'
 
@@ -177,6 +180,7 @@ async function snapshot(userId: string) {
       trialEndsOn: billing.trialEndsOn,
       periodEndsOn: billing.periodEndsOn,
       active: admin || billing.active,
+      requestedPlan: admin ? null : sub.requestedPlan || null,
     },
   }
 }
@@ -209,6 +213,7 @@ async function claimAdmin(password: string) {
     trialEndsOn: '2099-12-31',
     periodEndsOn: '2099-12-31',
     razorpayPaymentId: null,
+    requestedPlan: null,
   })
   return user
 }
@@ -235,7 +240,24 @@ async function ensureHq(userId: string) {
     trialEndsOn: '2099-12-31',
     periodEndsOn: '2099-12-31',
     razorpayPaymentId: sub?.razorpayPaymentId ?? null,
+    requestedPlan: null,
   })
+}
+
+async function billingAwareAudit(studioId?: string) {
+  const db = getStore()
+  const [recent, billing] = await Promise.all([
+    db.listAudit({ studioId, limit: studioId ? 40 : 150 }),
+    db.listAudit({ studioId, limit: 400, actionPrefix: 'billing.' }),
+  ])
+  const seen = new Set<string>()
+  const out: AuditRow[] = []
+  for (const row of [...billing, ...recent]) {
+    if (seen.has(row.id)) continue
+    seen.add(row.id)
+    out.push(row)
+  }
+  return out
 }
 
 async function lockedOut(email: string, ip: string) {
@@ -335,6 +357,7 @@ app.post('/auth/register', async (c) => {
     trialEndsOn: admin ? '2099-12-31' : trialEnd(),
     periodEndsOn: admin ? '2099-12-31' : null,
     razorpayPaymentId: null,
+    requestedPlan: null,
   })
   if (!admin) {
     const profile = {
@@ -643,32 +666,46 @@ app.post('/billing/checkout', async (c) => {
   const body = await readJson<{ plan?: string }>(c)
   const plan = PLANS[body.plan as PaidPlanId]
   if (!plan) return c.json({ error: 'Pick Studio or Studio Pro.' }, 400)
+  const db = getStore()
+  const sub = await db.getSub(actor.user.id)
+  if (sub) {
+    await db.upsertSub({ ...sub, requestedPlan: plan.id })
+  } else {
+    await db.upsertSub({
+      userId: actor.user.id,
+      plan: 'trial',
+      status: 'trialing',
+      trialEndsOn: trialEnd(),
+      periodEndsOn: null,
+      razorpayPaymentId: null,
+      requestedPlan: plan.id,
+    })
+  }
+  await audit({
+    action: 'billing.request',
+    userId: actor.user.id,
+    studioId: actor.studio.id,
+    detail: plan.id,
+    ip: clientIp(c),
+  })
+  await notifyPlanRequest({
+    email: actor.user.email,
+    studio: {
+      name: actor.studio.name,
+      owner: actor.studio.owner,
+      city: actor.studio.city,
+      phone: actor.studio.phone,
+      tagline: actor.studio.tagline,
+    },
+    plan: plan.id,
+    current: sub ? billingStatus(sub).plan : 'trial',
+  })
   const keyId = process.env.RAZORPAY_KEY_ID
   const keySecret = process.env.RAZORPAY_KEY_SECRET
   if (!keyId || !keySecret) {
-    await audit({
-      action: 'billing.request',
-      userId: actor.user.id,
-      studioId: actor.studio.id,
-      detail: plan.id,
-      ip: clientIp(c),
-    })
-    await notifySimple({
-      email: actor.user.email,
-      studio: {
-        name: actor.studio.name,
-        owner: actor.studio.owner,
-        city: actor.studio.city,
-        phone: actor.studio.phone,
-        tagline: actor.studio.tagline,
-      },
-      subject: `[GOLDHOUR PLAN] ${actor.studio.name} wants ${plan.name} now`,
-      detail: `They asked to start ${plan.name} (${plan.label} / month) now. They do not have to wait for the trial to end. Card checkout is not connected yet (Razorpay keys missing).`,
-    })
     return c.json({
       requested: true,
-      message:
-        'You can start a paid plan during the trial. Card checkout is not live yet — HQ has your request and can switch the desk now.',
+      message: `HQ has your ${plan.name} request. They will switch your desk — you do not have to wait.`,
     })
   }
   const receipt = `gh_${newId().replace(/-/g, '').slice(0, 32)}`
@@ -792,11 +829,11 @@ app.get('/notices', async (c) => {
   const db = getStore()
   const hq = isAdminEmail(actor.user.email) || actor.user.role === 'hq'
   if (hq) {
-    const [tenants, audit] = await Promise.all([db.listTenants(), db.listAudit({ limit: 80 })])
+    const [tenants, audit] = await Promise.all([db.listTenants(), billingAwareAudit()])
     return c.json({ notices: hqNotices({ tenants, audit }) })
   }
   const sub = await db.getSub(actor.user.id)
-  const audit = await db.listAudit({ studioId: actor.studio.id, limit: 40 })
+  const audit = await billingAwareAudit(actor.studio.id)
   return c.json({
     notices: studioNotices({
       leads: actor.studio.leads || [],
@@ -816,25 +853,36 @@ app.get('/admin/overview', async (c) => {
     await audit({ action: 'authz.denied', userId: actor.user.id, ip: clientIp(c), detail: 'admin.overview' })
     return c.json({ error: "You don't have permission to perform this action." }, 403)
   }
-  const tenants = await getStore().listTenants()
+  const db = getStore()
+  const [tenants, auditRows] = await Promise.all([db.listTenants(), billingAwareAudit()])
   await audit({ action: 'admin.overview', userId: actor.user.id, ip: clientIp(c) })
-  return c.json({
-    isAdmin: true,
-    tenants: tenants.map((row) => {
-      const profile = {
-        name: row.studio?.name || 'Untitled studio',
-        owner: row.studio?.owner || '',
-        city: row.studio?.city || '',
-        phone: row.studio?.phone || '',
-        tagline: row.studio?.tagline || '',
-      }
-      const billing = row.sub
-        ? billingStatus(row.sub)
-        : { plan: 'trial', status: 'expired' as const, trialEndsOn: '', periodEndsOn: null, active: false }
-      const admin = isAdminEmail(row.user.email)
-      const leads = Array.isArray(row.studio?.leads) ? row.studio.leads : []
-      const quotations = Array.isArray(row.studio?.quotations) ? row.studio.quotations : []
-      return {
+  const mapped = tenants.map((row) => {
+    const profile = {
+      name: row.studio?.name || 'Untitled studio',
+      owner: row.studio?.owner || '',
+      city: row.studio?.city || '',
+      phone: row.studio?.phone || '',
+      tagline: row.studio?.tagline || '',
+    }
+    const billing = row.sub
+      ? billingStatus(row.sub)
+      : { plan: 'trial', status: 'expired' as const, trialEndsOn: '', periodEndsOn: null, active: false }
+    const admin = isAdminEmail(row.user.email)
+    const leads = Array.isArray(row.studio?.leads) ? row.studio.leads : []
+    const quotations = Array.isArray(row.studio?.quotations) ? row.studio.quotations : []
+    const pending = admin
+      ? null
+      : pendingPlanRequest({
+          userId: row.user.id,
+          studioId: row.studio?.id,
+          currentPlan: billing.plan,
+          status: billing.status,
+          stored: row.sub?.requestedPlan,
+          audit: auditRows,
+        })
+    return {
+      row,
+      tenant: {
         email: row.user.email,
         createdAt: row.user.createdAt,
         isDemo: row.user.email === DEMO_EMAIL,
@@ -848,9 +896,21 @@ app.get('/admin/overview', async (c) => {
           trialEndsOn: billing.trialEndsOn,
           periodEndsOn: billing.periodEndsOn,
           active: admin || billing.active,
+          requestedPlan: pending?.plan || null,
+          requestedAt: pending?.at || null,
         },
-      }
+      },
+    }
+  })
+  await Promise.all(
+    mapped.flatMap(({ row, tenant }) => {
+      if (!tenant.billing.requestedPlan || !row.sub || row.sub.requestedPlan === tenant.billing.requestedPlan) return []
+      return [db.upsertSub({ ...row.sub, requestedPlan: tenant.billing.requestedPlan })]
     }),
+  )
+  return c.json({
+    isAdmin: true,
+    tenants: mapped.map((item) => item.tenant),
   })
 })
 
@@ -898,8 +958,9 @@ app.post('/admin/activate-plan', async (c) => {
     status: 'active',
     razorpayPaymentId: sub.razorpayPaymentId || 'hq-activate',
     periodEndsOn: addDays(todayIso(), plan.days),
+    requestedPlan: null,
   })
-  await notifyPaid(studio, user.email, plan.id, plan.amountPaise)
+  await notifyPlanApproved(studio, user.email, plan.id)
   await audit({
     action: 'billing.activate',
     userId: actor.user.id,

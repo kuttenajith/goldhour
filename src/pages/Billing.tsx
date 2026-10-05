@@ -114,6 +114,11 @@ export function Billing() {
         </p>
         {error ? <p className="mt-4 text-sm text-orange-200">{error}</p> : null}
         {note ? <p className="mt-4 text-sm text-gold-soft">{note}</p> : null}
+        {snap.billing.requestedPlan ? (
+          <p className="mt-4 text-sm text-gold-soft">
+            HQ has your {snap.billing.requestedPlan === 'studio_pro' ? 'Studio Pro' : 'Studio'} request. Your desk updates when they approve it.
+          </p>
+        ) : null}
         <div className="mt-10 grid gap-4 md:grid-cols-2">
           {plans.map((p) => (
             <article key={p.id} className="rounded-3xl border border-line bg-ink-2 p-6">

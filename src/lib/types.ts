@@ -98,6 +98,8 @@ export interface Billing {
   trialEndsOn: string
   periodEndsOn: string | null
   active: boolean
+  requestedPlan?: string | null
+  requestedAt?: string | null
 }
 
 export interface StudioSnapshot extends StudioState {

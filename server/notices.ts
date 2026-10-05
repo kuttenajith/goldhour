@@ -1,8 +1,9 @@
 import { outstanding, paidOf } from '../src/lib/booking.ts'
 import type { AppNotice, Lead } from '../src/lib/types.ts'
-import { todayIso } from './plans.ts'
+import { pendingPlanRequest, planTitle } from './planRequests.ts'
 import type { AuditRow, TenantPublic } from './db.ts'
 import { DEMO_EMAIL, isAdminEmail } from './constants.ts'
+import { todayIso } from './plans.ts'
 
 const SKIP = new Set(['admin.overview', 'logout', 'login.fail', 'login.lockout', 'authz.denied'])
 
@@ -172,6 +173,27 @@ export function hqNotices(opts: { tenants: TenantPublic[]; audit: AuditRow[] }):
     if (t.user.email === DEMO_EMAIL || isAdminEmail(t.user.email)) continue
     const email = t.user.email
     const name = t.studio?.name || email
+    const billing = t.sub
+      ? { plan: t.sub.plan, status: t.sub.status }
+      : { plan: 'trial', status: 'trialing' }
+    const pending = pendingPlanRequest({
+      userId: t.user.id,
+      studioId: t.studio?.id,
+      currentPlan: billing.plan,
+      status: billing.status,
+      stored: t.sub?.requestedPlan,
+      audit: opts.audit,
+    })
+    if (pending) {
+      live.push({
+        id: `hq-request:${email}:${pending.plan}`,
+        title: `${name} asked for ${planTitle(pending.plan)}`,
+        body: `${email} · open HQ and switch the desk`,
+        href: hqHref(email),
+        at: pending.at,
+        sticky: true,
+      })
+    }
     if (t.sub?.status === 'trialing' && t.sub.trialEndsOn) {
       const left = daysBetween(today, t.sub.trialEndsOn)
       if (left >= 0 && left <= 5) {
