@@ -19,13 +19,15 @@ const plans = [
     id: 'studio',
     name: 'Studio',
     price: '₹999',
-    note: 'One photographer or a small team. Unlimited bookings.',
+    note: 'The booking desk: leads, quotes, follow-ups and couple payments.',
+    items: ['Unlimited leads and bookings', 'Quotations as PDF', 'Couple payments', 'Follow-ups', 'Event checklist'],
   },
   {
     id: 'studio_pro',
     name: 'Studio Pro',
     price: '₹1,500',
-    note: 'When you need the higher desk. Same workflow, billed as Pro.',
+    note: 'Studio plus calendar, day-of timeline, WhatsApp desk, Padmavathi and reports.',
+    items: ['Everything in Studio', 'Wedding calendar', 'Day-of timeline', 'WhatsApp templates', 'Padmavathi', 'Activity reports'],
   },
 ]
 
@@ -121,6 +123,11 @@ export function Billing() {
                 <span className="text-lg text-mute"> / month</span>
               </p>
               <p className="mt-3 text-sm text-mute">{p.note}</p>
+              <ul className="mt-4 space-y-1 text-sm text-gold-soft">
+                {p.items.map((item) => (
+                  <li key={item}>· {item}</li>
+                ))}
+              </ul>
               <Button className="mt-6 w-full" disabled={busy !== null || snap.isDemo} onClick={() => void pay(p.id)}>
                 {busy === p.id ? 'Starting…' : snap.billing.status === 'trialing' ? `Start ${p.name} now` : `Pay ${p.price}`}
               </Button>

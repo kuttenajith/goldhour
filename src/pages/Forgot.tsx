@@ -41,7 +41,7 @@ export function Forgot() {
           <p className="mt-8 text-gold-soft">If that studio exists, the reset mail is on its way. Check spam.</p>
         ) : (
           <form onSubmit={submit} className="mt-8 space-y-5">
-            <Field label="Email" error={hint}>
+            <Field label="Email" error={hint} required>
               <input
                 className={fieldBox(hint)}
                 type="email"
@@ -110,7 +110,7 @@ export function Reset() {
           </p>
         ) : (
           <form onSubmit={submit} className="mt-8 space-y-5">
-            <Field label="New password (8+ characters)" error={hint}>
+            <Field label="New password (8+ characters)" error={hint} required>
               <input
                 className={fieldBox(hint)}
                 type="password"

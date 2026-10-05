@@ -54,7 +54,7 @@ export function NoticeBell() {
     <div className="relative">
       <button
         type="button"
-        className="relative inline-flex h-10 w-10 items-center justify-center rounded-full border border-line text-gold-soft hover:border-gold/50 hover:text-cream"
+        className="relative inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-line text-gold-soft hover:border-gold/50 hover:text-cream"
         aria-label="Notifications"
         onClick={() => setOpen((v) => !v)}
       >

@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { PageHeader } from '../components/PageHeader.tsx'
+import { UpgradeGate } from '../components/UpgradeGate.tsx'
 import { day, money } from '../lib/format.ts'
+import { hasProDesk } from '../lib/planAccess.ts'
 import { useStudio } from '../lib/store.ts'
 import { clsx } from '../lib/clsx.ts'
 
@@ -26,7 +28,16 @@ function iso(d: Date) {
 }
 
 export function Calendar() {
-  const { leads } = useStudio()
+  const snap = useStudio()
+  const { leads } = snap
+  if (!hasProDesk(snap)) {
+    return (
+      <UpgradeGate
+        title="Calendar is on Studio Pro"
+        copy="Studio keeps the booking desk. Pro adds the month view so every mehendi, wedding and reception sits on one calendar."
+      />
+    )
+  }
   const [cursor, setCursor] = useState(() => {
     const n = new Date()
     return { y: n.getFullYear(), m: n.getMonth() }

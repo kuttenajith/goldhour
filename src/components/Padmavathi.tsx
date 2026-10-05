@@ -5,6 +5,7 @@ import { MessageCircle, X } from 'lucide-react'
 import { answerCopilot, greeting } from '../lib/copilot.ts'
 import { api, useSession } from '../lib/store.ts'
 import { isTabStale, subscribeTab } from '../lib/tabLock.ts'
+import { hasProDesk } from '../lib/planAccess.ts'
 import { clsx } from '../lib/clsx.ts'
 import type { AdminOverview } from '../lib/types.ts'
 
@@ -61,6 +62,7 @@ export function Padmavathi() {
     location.pathname.startsWith('/studio') || location.pathname.startsWith('/admin')
 
   if (!authed || !snap || stale || !onDesk) return null
+  if (!hasProDesk(snap) && !snap.isAdmin) return null
 
   const desk = snap
   const chips = desk.isAdmin ? hqChips : deskChips

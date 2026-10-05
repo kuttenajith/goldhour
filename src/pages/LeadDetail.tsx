@@ -11,7 +11,7 @@ import { StatusPill } from '../components/StatusPill.tsx'
 import { paidOf, splitPlan, weddingEvent } from '../lib/booking.ts'
 import { addDays, clock, day, money, paid, PAYMENT_LABEL, todayIso } from '../lib/format.ts'
 import { id } from '../lib/ids.ts'
-import { moneyError, onlyMoney } from '../lib/input.ts'
+import { moneyError, onlyMoney, requiredText } from '../lib/input.ts'
 import { downloadQuotation } from '../lib/pdf.ts'
 import {
   addPayment,
@@ -22,6 +22,7 @@ import {
   upsertLead,
   useStudio,
 } from '../lib/store.ts'
+import { hasProDesk } from '../lib/planAccess.ts'
 import {
   eventMessage,
   followUpMessage,
@@ -152,7 +153,7 @@ export function LeadDetail() {
                       ),
                     })
                   }
-                  className="flex w-full items-center justify-between rounded-2xl border border-line px-4 py-3 text-left"
+                  className="flex w-full cursor-pointer items-center justify-between rounded-2xl border border-line px-4 py-3 text-left hover:border-gold/40"
                 >
                   <span className="flex items-center gap-3">
                     <span
@@ -196,28 +197,39 @@ export function LeadDetail() {
         </article>
 
         <div className="space-y-6">
-          <article className="rounded-3xl border border-line bg-ink-2 p-5 sm:p-6">
-            <p className="text-xs uppercase tracking-[0.22em] text-mute">WhatsApp</p>
-            <div className="mt-4 grid gap-2">
-              {lead.status === 'new' ? (
-                <WaButton href={waLink(lead.phone, qualifyMessage(state.studio, lead))}>
-                  Ask date, venue & functions
+          {hasProDesk(state) ? (
+            <article className="rounded-3xl border border-line bg-ink-2 p-5 sm:p-6">
+              <p className="text-xs uppercase tracking-[0.22em] text-mute">WhatsApp</p>
+              <div className="mt-4 grid gap-2">
+                {lead.status === 'new' ? (
+                  <WaButton href={waLink(lead.phone, qualifyMessage(state.studio, lead))}>
+                    Ask date, venue & functions
+                  </WaButton>
+                ) : null}
+                <WaButton href={waLink(lead.phone, quotationMessage(state.studio, lead))}>
+                  Send quotation
                 </WaButton>
-              ) : null}
-              <WaButton href={waLink(lead.phone, quotationMessage(state.studio, lead))}>
-                Send quotation
-              </WaButton>
-              <WaButton href={waLink(lead.phone, followUpMessage(state.studio, lead))}>
-                Send follow-up
-              </WaButton>
-              <WaButton href={waLink(lead.phone, paymentMessage(state.studio, lead))}>
-                Send payment reminder
-              </WaButton>
-              <WaButton href={waLink(lead.phone, eventMessage(state.studio, lead))}>
-                Send event reminder
-              </WaButton>
-            </div>
-          </article>
+                <WaButton href={waLink(lead.phone, followUpMessage(state.studio, lead))}>
+                  Send follow-up
+                </WaButton>
+                <WaButton href={waLink(lead.phone, paymentMessage(state.studio, lead))}>
+                  Send payment reminder
+                </WaButton>
+                <WaButton href={waLink(lead.phone, eventMessage(state.studio, lead))}>
+                  Send event reminder
+                </WaButton>
+              </div>
+            </article>
+          ) : (
+            <article className="rounded-3xl border border-gold/35 bg-ink-2 p-5 sm:p-6">
+              <p className="text-xs uppercase tracking-[0.22em] text-gold-soft">Studio Pro</p>
+              <p className="mt-2 font-medium">WhatsApp desk</p>
+              <p className="mt-2 text-sm text-mute">Templates to ask for date, send the quote, and remind for payment sit on Studio Pro.</p>
+              <Link to="/studio/billing" className="mt-3 inline-block text-sm text-gold-soft">
+                Upgrade to Pro
+              </Link>
+            </article>
+          )}
           <article className="rounded-3xl border border-line bg-ink-2 p-5 sm:p-6">
             <p className="text-xs uppercase tracking-[0.22em] text-mute">Notes</p>
             <p className="mt-3 text-sm leading-relaxed text-cream/80">{lead.notes || '—'}</p>
@@ -228,15 +240,26 @@ export function LeadDetail() {
       <PaymentBoard lead={lead} />
 
       {wedding ? (
-        <TimelineBoard
-          date={wedding.date || lead.eventDate}
-          slots={wedding.timeline}
-          onChange={(timeline) =>
-            patchLead(lead.id, {
-              events: lead.events.map((ev) => (ev.id === wedding.id ? { ...ev, timeline } : ev)),
-            })
-          }
-        />
+        hasProDesk(state) ? (
+          <TimelineBoard
+            date={wedding.date || lead.eventDate}
+            slots={wedding.timeline}
+            onChange={(timeline) =>
+              patchLead(lead.id, {
+                events: lead.events.map((ev) => (ev.id === wedding.id ? { ...ev, timeline } : ev)),
+              })
+            }
+          />
+        ) : (
+          <article className="rounded-3xl border border-gold/35 bg-ink-2 p-5 sm:p-6">
+            <p className="text-xs uppercase tracking-[0.22em] text-gold-soft">Studio Pro</p>
+            <p className="mt-2 font-display text-2xl">Day-of timeline</p>
+            <p className="mt-2 text-sm text-mute">Getting-ready through portraits lives on Studio Pro. Studio still runs the booking and payments.</p>
+            <Link to="/studio/billing" className="mt-3 inline-block text-sm text-gold-soft">
+              Upgrade to Pro
+            </Link>
+          </article>
+        )
       ) : null}
 
       <button
@@ -336,7 +359,7 @@ function WaButton({ href, children }: { href: string; children: string }) {
       href={href}
       target="_blank"
       rel="noreferrer"
-      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-gold/40 px-4 py-2.5 text-center text-sm text-gold-soft hover:border-gold hover:text-cream"
+      className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-full border border-gold/40 px-4 py-2.5 text-center text-sm text-gold-soft hover:border-gold hover:text-cream"
     >
       <MessageCircle size={16} /> {children}
     </a>
@@ -425,7 +448,7 @@ function TimelineBoard({
               }
             />
             <button
-              className="text-xs text-mute hover:text-cream"
+              className="cursor-pointer text-xs text-mute hover:text-cream"
               onClick={() => onChange(slots.filter((s) => s.id !== slot.id))}
             >
               Remove
@@ -459,8 +482,9 @@ function PaymentModal({
   function submit(e: FormEvent) {
     e.preventDefault()
     const msg = moneyError(amount)
-    setError(msg)
-    if (msg) return
+    const noteMsg = requiredText(note, 'a payment note')
+    setError(msg || noteMsg)
+    if (msg || noteMsg) return
     onSave({
       id: id(),
       amount: Number(amount),
@@ -473,7 +497,7 @@ function PaymentModal({
   return (
     <Modal title="Record payment" onClose={onClose}>
       <form onSubmit={submit} className="space-y-4" noValidate>
-        <Field label="Amount" error={error} hint="Numbers only">
+        <Field label="Amount" error={error.includes('amount') || error.includes('Amount') ? error : ''} hint="Numbers only" required>
           <input
             required
             inputMode="numeric"
@@ -486,8 +510,9 @@ function PaymentModal({
             }}
           />
         </Field>
-        <Field label="Stage">
+        <Field label="Stage" required>
           <select
+            required
             className={fieldBox()}
             value={kind}
             onChange={(e) => setKind(e.target.value as PaymentKind)}
@@ -498,8 +523,14 @@ function PaymentModal({
             <option value="extra">{PAYMENT_LABEL.extra}</option>
           </select>
         </Field>
-        <Field label="Note">
-          <input className={fieldBox()} value={note} onChange={(e) => setNote(e.target.value.slice(0, 80))} placeholder="UPI / cash / transfer" />
+        <Field label="Note" error={error.includes('note') ? error : ''} required>
+          <input
+            required
+            className={fieldBox()}
+            value={note}
+            onChange={(e) => setNote(e.target.value.slice(0, 80))}
+            placeholder="UPI / cash / transfer"
+          />
         </Field>
         <div className="flex flex-wrap justify-end gap-2">
           <Button tone="ghost" onClick={onClose}>
@@ -538,15 +569,17 @@ function QuoteModal({
   function submit(e: FormEvent) {
     e.preventDefault()
     const msg = moneyError(amount)
-    setError(msg)
-    if (msg || !packageName.trim()) return
+    const pack = requiredText(packageName, 'the package name')
+    const noteMsg = requiredText(notes, 'notes for the PDF')
+    setError(msg || pack || noteMsg)
+    if (msg || pack || noteMsg) return
     onSave(packageName, Number(amount), notes)
   }
 
   return (
     <Modal title="Quotation" onClose={onClose}>
       <form onSubmit={submit} className="space-y-4" noValidate>
-        <Field label="Package">
+        <Field label="Package" error={error.includes('package') ? error : ''} required>
           <input
             required
             className={fieldBox()}
@@ -554,7 +587,7 @@ function QuoteModal({
             onChange={(e) => setPackageName(e.target.value.slice(0, 80))}
           />
         </Field>
-        <Field label="Amount" error={error} hint="Numbers only">
+        <Field label="Amount" error={error.includes('amount') || error.includes('Amount') ? error : ''} hint="Numbers only" required>
           <input
             required
             inputMode="numeric"
@@ -567,8 +600,9 @@ function QuoteModal({
             }}
           />
         </Field>
-        <Field label="Notes on the PDF">
+        <Field label="Notes on the PDF" error={error.includes('notes') ? error : ''} required>
           <textarea
+            required
             className={fieldBox() + ' min-h-24'}
             value={notes}
             onChange={(e) => setNotes(e.target.value.slice(0, 500))}

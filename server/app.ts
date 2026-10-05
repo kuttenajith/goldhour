@@ -282,8 +282,14 @@ app.post('/auth/register', async (c) => {
   const email = body.email?.trim().toLowerCase() || ''
   const password = body.password || ''
   const studioName = (body.studioName || '').trim()
+  const owner = (body.owner || '').trim()
+  const city = (body.city || '').trim()
+  const phone = (body.phone || '').trim()
   if (!emailOk(email) || !passwordOk(password) || studioName.length < 2) {
     return c.json({ error: 'Email, studio name, and an 8+ character password are required.' }, 400)
+  }
+  if (!isAdminEmail(email) && (owner.length < 2 || city.length < 2 || phone.replace(/\D/g, '').length < 10)) {
+    return c.json({ error: 'Owner, city, and a 10-digit phone are required.' }, 400)
   }
   await getStore().recordAuthAttempt(email, ip, true)
   const db = getStore()

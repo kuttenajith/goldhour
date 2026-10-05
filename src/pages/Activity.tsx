@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
-import { api } from '../lib/store.ts'
+import { api, useStudio } from '../lib/store.ts'
+import { UpgradeGate } from '../components/UpgradeGate.tsx'
+import { hasProDesk } from '../lib/planAccess.ts'
 
 type Event = { id: string; action: string; detail: string; createdAt: string }
 
@@ -25,14 +27,25 @@ const LABELS: Record<string, string> = {
 }
 
 export function Activity() {
+  const snap = useStudio()
   const [events, setEvents] = useState<Event[]>([])
   const [error, setError] = useState('')
 
   useEffect(() => {
+    if (!hasProDesk(snap)) return
     api<{ events: Event[] }>('/api/studio/activity')
       .then((data) => setEvents(data.events || []))
       .catch((err) => setError(err instanceof Error ? err.message : 'Could not load activity'))
-  }, [])
+  }, [snap.billing.plan, snap.billing.status])
+
+  if (!hasProDesk(snap)) {
+    return (
+      <UpgradeGate
+        title="Activity reports are on Studio Pro"
+        copy="Studio runs the live desk. Pro keeps a report of every sign-in, quote, payment and HQ action."
+      />
+    )
+  }
 
   return (
     <div className="page-rise space-y-6">

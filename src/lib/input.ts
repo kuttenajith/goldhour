@@ -57,3 +57,9 @@ export function passwordError(value: string) {
   if (value.length < 8) return 'Use 8 or more characters'
   return ''
 }
+
+export function requiredText(value: string, label: string) {
+  if (!value.trim()) return `Enter ${label}`
+  if (value.trim().length < 2) return `Enter ${label}`
+  return ''
+}

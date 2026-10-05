@@ -6,15 +6,20 @@ export function Field({
   children,
   error,
   hint,
+  required,
 }: {
   label: string
   children: ReactNode
   error?: string
   hint?: string
+  required?: boolean
 }) {
   return (
     <label className="block space-y-1.5">
-      <span className="text-[13px] font-semibold uppercase tracking-[0.08em] text-mute">{label}</span>
+      <span className="text-[13px] font-semibold uppercase tracking-[0.08em] text-mute">
+        {label}
+        {required ? <span className="text-gold-soft"> *</span> : null}
+      </span>
       {children}
       {error ? <span className="block text-sm text-orange-200">{error}</span> : null}
       {!error && hint ? <span className="block text-sm text-mute">{hint}</span> : null}

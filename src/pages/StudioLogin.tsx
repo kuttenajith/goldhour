@@ -87,8 +87,9 @@ export function StudioLogin() {
           <span className="text-gold-soft">2026</span>.
         </p>
         <form onSubmit={submit} className="mt-10 max-w-sm space-y-5">
-          <Field label="Email" error={emailHint}>
+          <Field label="Email" error={emailHint} required>
             <input
+              required
               className={fieldBox(emailHint)}
               value={email}
               onChange={(e) => {
@@ -101,8 +102,9 @@ export function StudioLogin() {
               placeholder="studio@email.com"
             />
           </Field>
-          <Field label="Password">
+          <Field label="Password" required>
             <input
+              required
               className={fieldBox()}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -127,8 +129,9 @@ export function StudioLogin() {
         </p>
         <form onSubmit={openDemo} className="mt-10 max-w-sm space-y-3 border-t border-line pt-8">
           <p className="text-sm text-mute">Walk the Madurai demo. Leave your email and we’ll send the 14-day trial offer.</p>
-          <Field label="Demo PIN">
+          <Field label="Demo PIN" required>
             <input
+              required
               className={fieldBox()}
               value={pin}
               onChange={(e) => setPin(onlyPhone(e.target.value).replace('+', '').slice(0, 4))}

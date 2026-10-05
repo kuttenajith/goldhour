@@ -7,7 +7,7 @@ export function ThemeToggle({ compact = false }: { compact?: boolean }) {
   return (
     <button
       type="button"
-      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-line text-gold-soft hover:border-gold/50 hover:text-cream"
+      className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-line text-gold-soft hover:border-gold/50 hover:text-cream"
       onClick={toggleTheme}
       aria-label={midnight ? 'Switch to daylight' : 'Switch to midnight'}
       title={midnight ? 'Midnight' : 'Daylight'}

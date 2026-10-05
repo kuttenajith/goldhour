@@ -12,6 +12,7 @@ import {
   onlyPhone,
   passwordError,
   phoneError,
+  requiredText,
 } from '../lib/input.ts'
 import type { StudioSnapshot } from '../lib/types.ts'
 
@@ -23,15 +24,16 @@ export function Signup() {
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [errors, setErrors] = useState({ studioName: '', owner: '', phone: '', email: '', password: '' })
+  const [errors, setErrors] = useState({ studioName: '', owner: '', city: '', phone: '', email: '', password: '' })
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
   function validate() {
     const next = {
       studioName: nameError(studioName) ? 'Enter the studio name' : '',
-      owner: owner ? nameError(owner) : '',
-      phone: phone ? phoneError(phone) : '',
+      owner: requiredText(owner, 'the owner name'),
+      city: requiredText(city, 'the city'),
+      phone: phoneError(phone),
       email: emailError(email),
       password: passwordError(password),
     }
@@ -67,7 +69,7 @@ export function Signup() {
           14 days free. Then ₹999 / month. Your leads stay on the server, not in this browser.
         </p>
         <form onSubmit={submit} className="mt-10 space-y-5" noValidate>
-          <Field label="Studio name" error={errors.studioName}>
+          <Field label="Studio name" error={errors.studioName} required>
             <input
               className={fieldBox(errors.studioName)}
               value={studioName}
@@ -80,28 +82,35 @@ export function Signup() {
             />
           </Field>
           <div className="grid gap-5 sm:grid-cols-2">
-            <Field label="Owner" error={errors.owner}>
+            <Field label="Owner" error={errors.owner} required>
               <input
+                required
                 className={fieldBox(errors.owner)}
                 value={owner}
                 onChange={(e) => {
                   const v = onlyName(e.target.value)
                   setOwner(v)
-                  setErrors((p) => ({ ...p, owner: v ? nameError(v) : '' }))
+                  setErrors((p) => ({ ...p, owner: v ? requiredText(v, 'the owner name') : '' }))
                 }}
               />
             </Field>
-            <Field label="City">
+            <Field label="City" error={errors.city} required>
               <input
-                className={fieldBox()}
+                required
+                className={fieldBox(errors.city)}
                 value={city}
-                onChange={(e) => setCity(onlyName(e.target.value))}
+                onChange={(e) => {
+                  const v = onlyName(e.target.value)
+                  setCity(v)
+                  setErrors((p) => ({ ...p, city: v ? requiredText(v, 'the city') : '' }))
+                }}
                 placeholder="Madurai"
               />
             </Field>
           </div>
-          <Field label="WhatsApp / phone" error={errors.phone} hint="Numbers only">
+          <Field label="WhatsApp / phone" error={errors.phone} hint="Numbers only" required>
             <input
+              required
               className={fieldBox(errors.phone)}
               value={phone}
               inputMode="tel"
@@ -112,7 +121,7 @@ export function Signup() {
               }}
             />
           </Field>
-          <Field label="Email" error={errors.email}>
+          <Field label="Email" error={errors.email} required>
             <input
               className={fieldBox(errors.email)}
               type="email"
@@ -125,7 +134,7 @@ export function Signup() {
               required
             />
           </Field>
-          <Field label="Password (8+ characters)" error={errors.password}>
+          <Field label="Password (8+ characters)" error={errors.password} required>
             <input
               className={fieldBox(errors.password)}
               type="password"

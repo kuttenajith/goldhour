@@ -24,18 +24,19 @@ import { UserHello } from '../components/UserHello.tsx'
 import { firstName } from '../lib/copilot.ts'
 import { todayIso } from '../lib/format.ts'
 import { readNavCollapsed, writeNavCollapsed } from '../lib/navCollapse.ts'
+import { planLabel } from '../lib/planAccess.ts'
 import { logoutStudio, useStudio } from '../lib/store.ts'
 import { clsx } from '../lib/clsx.ts'
 
-const links = [
+const links: { to: string; label: string; icon: typeof LayoutDashboard; end?: boolean; pro?: boolean }[] = [
   { to: '/studio', label: 'Desk', icon: LayoutDashboard, end: true },
   { to: '/studio/leads', label: 'Leads', icon: Users },
   { to: '/studio/bookings', label: 'Bookings', icon: CalendarDays },
-  { to: '/studio/calendar', label: 'Calendar', icon: CalendarDays },
+  { to: '/studio/calendar', label: 'Calendar', icon: CalendarDays, pro: true },
   { to: '/studio/follow-ups', label: 'Follow-ups', icon: Bell },
   { to: '/studio/quotations', label: 'Quotes', icon: FileText },
   { to: '/studio/payments', label: 'Payments', icon: IndianRupee },
-  { to: '/studio/activity', label: 'Activity', icon: ScrollText },
+  { to: '/studio/activity', label: 'Activity', icon: ScrollText, pro: true },
   { to: '/studio/billing', label: 'Plan', icon: CreditCard },
 ]
 
@@ -59,7 +60,7 @@ function DeskNav({
           onClick={onNavigate}
           className={({ isActive }) =>
             clsx(
-              'flex min-h-9 items-center gap-2.5 rounded-xl px-2.5 text-sm transition',
+              'flex min-h-9 cursor-pointer items-center gap-2.5 rounded-xl px-2.5 text-sm transition',
               collapsed && 'justify-center px-0',
               isActive ? 'bg-gold/12 text-gold-soft' : 'text-cream/70 hover:bg-white/5 hover:text-cream',
             )
@@ -67,6 +68,9 @@ function DeskNav({
         >
           <link.icon size={15} />
           {collapsed ? <span className="sr-only">{link.label}</span> : <span className="flex-1 truncate">{link.label}</span>}
+          {!collapsed && link.pro ? (
+            <span className="rounded-full border border-gold/35 px-1.5 text-[9px] uppercase tracking-wider text-gold-soft">Pro</span>
+          ) : null}
           {!collapsed && link.to === '/studio/follow-ups' && due > 0 ? (
             <span className="rounded-full bg-gold px-1.5 text-[10px] font-semibold text-ink">{due}</span>
           ) : null}
@@ -112,11 +116,11 @@ export function StudioShell() {
       <Onboarding />
       <div
         className={clsx(
-          'flex h-full max-h-full overflow-hidden lg:grid',
+          'flex h-full max-h-full overflow-hidden lg:grid [@media(orientation:landscape)_and_(max-height:720px)]:!flex',
           collapsed ? 'lg:grid-cols-[4.5rem_minmax(0,1fr)]' : 'lg:grid-cols-[212px_minmax(0,1fr)]',
         )}
       >
-        <aside className="group/rail relative hidden min-h-0 border-r border-line bg-ink-2 lg:flex lg:h-dvh lg:flex-col">
+        <aside className="group/rail relative hidden min-h-0 border-r border-line bg-ink-2 lg:flex lg:h-dvh lg:flex-col [@media(orientation:landscape)_and_(max-height:720px)]:!hidden">
           <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden px-2 py-4">
             <div className={clsx('flex items-start gap-1', collapsed ? 'justify-center' : 'px-1')}>
               <div className={clsx('min-w-0', collapsed && 'flex justify-center')}>
@@ -174,36 +178,38 @@ export function StudioShell() {
         </aside>
 
         {menuOpen ? (
-          <div className="fixed inset-0 z-[75] lg:hidden">
-            <button type="button" className="absolute inset-0 bg-ink/70" aria-label="Close menu" onClick={() => setMenuOpen(false)} />
-            <div className="relative flex h-full w-[min(100vw-3rem,280px)] flex-col border-r border-line bg-ink-2 px-3 py-4">
-              <div className="flex items-start justify-between gap-2 px-1">
-                <div>
+          <div className="fixed inset-0 z-[75] flex">
+            <button type="button" className="absolute inset-0 cursor-pointer bg-ink/70" aria-label="Close menu" onClick={() => setMenuOpen(false)} />
+            <div className="relative flex h-dvh max-h-dvh w-[min(100vw-3rem,300px)] flex-col overflow-hidden border-r border-line bg-ink-2">
+              <div className="flex shrink-0 items-start justify-between gap-2 px-3 pt-4">
+                <div className="min-w-0 px-1">
                   <BrandMark />
                   <p className="mt-2 truncate text-[11px] uppercase tracking-[0.18em] text-mute">{studio.name}</p>
                 </div>
                 <button
                   type="button"
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-line text-mute hover:text-cream"
+                  className="inline-flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full border border-line text-mute hover:text-cream"
                   aria-label="Close menu"
                   onClick={() => setMenuOpen(false)}
                 >
                   <X size={16} />
                 </button>
               </div>
-              {isAdmin ? (
-                <Link
-                  to="/admin"
-                  onClick={() => setMenuOpen(false)}
-                  className="mt-4 mx-1 inline-flex min-h-9 items-center rounded-xl bg-gold/12 px-3 text-xs font-medium text-gold-soft"
-                >
-                  HQ · all studios
-                </Link>
-              ) : null}
-              <DeskNav due={due} onNavigate={() => setMenuOpen(false)} />
-              <div className="mt-auto flex items-center justify-between gap-2 px-1 pt-4">
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-3 touch-pan-y">
+                {isAdmin ? (
+                  <Link
+                    to="/admin"
+                    onClick={() => setMenuOpen(false)}
+                    className="mt-4 mx-1 inline-flex min-h-9 cursor-pointer items-center rounded-xl bg-gold/12 px-3 text-xs font-medium text-gold-soft"
+                  >
+                    HQ · all studios
+                  </Link>
+                ) : null}
+                <DeskNav due={due} onNavigate={() => setMenuOpen(false)} />
+              </div>
+              <div className="flex shrink-0 items-center justify-between gap-2 border-t border-line px-4 py-3">
                 <ThemeToggle />
-                <button className="inline-flex min-h-9 items-center gap-2 text-sm text-mute hover:text-cream" onClick={signOut}>
+                <button className="inline-flex min-h-9 cursor-pointer items-center gap-2 text-sm text-mute hover:text-cream" onClick={signOut}>
                   <LogOut size={14} /> Sign out
                 </button>
               </div>
@@ -213,7 +219,7 @@ export function StudioShell() {
 
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           <header className="flex shrink-0 items-center justify-between gap-3 border-b border-line bg-ink-2 px-4 py-2.5">
-            <div className="flex min-w-0 items-center gap-3 lg:hidden">
+            <div className="flex min-w-0 items-center gap-3 lg:hidden [@media(orientation:landscape)_and_(max-height:720px)]:!flex">
               <BrandMark markOnly />
               {isAdmin ? (
                 <Link to="/admin" className="shrink-0 text-xs uppercase tracking-[0.18em] text-gold-soft">
@@ -222,11 +228,11 @@ export function StudioShell() {
               ) : null}
               <span className="truncate text-xs uppercase tracking-[0.18em] text-gold-soft">{studio.name}</span>
             </div>
-            <p className="hidden truncate text-sm text-mute lg:block">{studio.name}</p>
+            <p className="hidden truncate text-sm text-mute lg:block [@media(orientation:landscape)_and_(max-height:720px)]:!hidden">{studio.name}</p>
             <div className="flex shrink-0 items-center gap-2 sm:gap-3">
               <button
                 type="button"
-                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-line text-gold-soft hover:border-gold/50 hover:text-cream lg:hidden"
+                className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-line text-gold-soft hover:border-gold/50 hover:text-cream lg:hidden [@media(orientation:landscape)_and_(max-height:720px)]:!inline-flex"
                 aria-label="Open menu"
                 onClick={() => setMenuOpen(true)}
               >
@@ -234,6 +240,9 @@ export function StudioShell() {
               </button>
               <NoticeBell />
               <UserHello name={name} />
+              <span className="hidden rounded-full border border-gold/35 px-2 py-1 text-[10px] uppercase tracking-[0.14em] text-gold-soft sm:inline">
+                {planLabel(snap)}
+              </span>
             </div>
           </header>
           <main className="page-rise min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-5 pb-20 sm:px-7 sm:py-6 sm:pb-20">
