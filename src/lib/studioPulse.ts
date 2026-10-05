@@ -21,7 +21,7 @@ function daysBetween(from: string, to: string) {
 
 function occupiedDates(lead: Lead) {
   if (lead.status !== 'booked' && lead.status !== 'accepted') return [] as string[]
-  return [lead.eventDate, ...lead.events.map((ev) => ev.date)].filter(Boolean)
+  return [lead.eventDate, ...(lead.events || []).map((ev) => ev.date)].filter(Boolean)
 }
 
 export function dateClashes(leads: Lead[]): DateClash[] {

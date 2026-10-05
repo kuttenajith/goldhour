@@ -4,7 +4,7 @@ import { dateClashes, morningBrief, staleQuotes } from '../src/lib/studioPulse.t
 import { pendingPlanRequest, planTitle } from './planRequests.ts'
 import type { AuditRow, TenantPublic } from './db.ts'
 import { DEMO_EMAIL, isAdminEmail } from './constants.ts'
-import { todayIso } from './plans.ts'
+import { billingStatus, todayIso } from './plans.ts'
 
 const SKIP = new Set(['admin.overview', 'logout', 'login.fail', 'login.lockout', 'authz.denied'])
 
@@ -23,10 +23,21 @@ const LABELS: Record<string, string> = {
   'demo.reset': 'Reset the demo desk',
 }
 
+function asIso(value: unknown) {
+  if (!value) return ''
+  if (value instanceof Date) return value.toISOString()
+  return String(value)
+}
+
+function asDay(value: unknown) {
+  return asIso(value).slice(0, 10)
+}
+
 function daysBetween(from: string, to: string) {
-  const a = new Date(`${from}T00:00:00`)
-  const b = new Date(`${to}T00:00:00`)
-  return Math.round((b.getTime() - a.getTime()) / 86400000)
+  const a = new Date(`${asDay(from)}T00:00:00`)
+  const b = new Date(`${asDay(to)}T00:00:00`)
+  const n = Math.round((b.getTime() - a.getTime()) / 86400000)
+  return Number.isFinite(n) ? n : 99
 }
 
 function followDue(lead: Lead, today: string) {
@@ -205,80 +216,90 @@ export function hqNotices(opts: { tenants: TenantPublic[]; audit: AuditRow[] }):
   const live: AppNotice[] = []
 
   for (const t of opts.tenants) {
-    if (t.user.email === DEMO_EMAIL || isAdminEmail(t.user.email)) continue
-    const email = t.user.email
-    const name = t.studio?.name || email
-    const billing = t.sub
-      ? { plan: t.sub.plan, status: t.sub.status }
-      : { plan: 'trial', status: 'trialing' }
-    const pending = pendingPlanRequest({
-      userId: t.user.id,
-      studioId: t.studio?.id,
-      currentPlan: billing.plan,
-      status: billing.status,
-      stored: t.sub?.requestedPlan,
-      audit: opts.audit,
-    })
-    if (pending) {
-      live.push({
-        id: `hq-request:${email}:${pending.plan}`,
-        title: `${name} asked for ${planTitle(pending.plan)}`,
-        body: `${email} · open HQ and switch the desk`,
-        href: hqHref(email),
-        at: pending.at,
-        sticky: true,
+    try {
+      if (t.user.email === DEMO_EMAIL || isAdminEmail(t.user.email)) continue
+      const email = t.user.email
+      const name = t.studio?.name || email
+      const billing = t.sub
+        ? billingStatus(t.sub)
+        : { plan: 'trial', status: 'trialing' as const, trialEndsOn: '', periodEndsOn: null, active: false }
+      const pending = pendingPlanRequest({
+        userId: t.user.id,
+        studioId: t.studio?.id,
+        currentPlan: billing.plan,
+        status: billing.status,
+        stored: t.sub?.requestedPlan,
+        audit: opts.audit,
       })
-    }
-    if (t.sub?.status === 'trialing' && t.sub.trialEndsOn) {
-      const left = daysBetween(today, t.sub.trialEndsOn)
-      if (left >= 0 && left <= 5) {
+      if (pending) {
         live.push({
-          id: `hq-trial:${email}:${t.sub.trialEndsOn}`,
-          title: `${name} · trial ending`,
-          body: left === 0 ? 'Ends today' : `${left} day${left === 1 ? '' : 's'} left · ${email}`,
+          id: `hq-request:${email}:${pending.plan}`,
+          title: `${name} asked for ${planTitle(pending.plan)}`,
+          body: `${email} · open HQ and switch the desk`,
           href: hqHref(email),
-          at: `${t.sub.trialEndsOn}T00:00:00.000Z`,
+          at: pending.at,
           sticky: true,
         })
       }
-    }
-    const created = t.user.createdAt.slice(0, 10)
-    if (created && daysBetween(created, today) <= 2) {
-      live.push({
-        id: `hq-new:${email}`,
-        title: `${name} joined`,
-        body: `${email} started a GoldHour desk`,
-        href: hqHref(email),
-        at: t.user.createdAt,
-        sticky: true,
-      })
-    }
-    for (const lead of t.studio?.leads || []) {
-      if (followDue(lead, today)) {
+      if (billing.status === 'trialing' && billing.trialEndsOn) {
+        const left = daysBetween(today, billing.trialEndsOn)
+        if (left >= 0 && left <= 5) {
+          live.push({
+            id: `hq-trial:${email}:${billing.trialEndsOn}`,
+            title: `${name} · trial ending`,
+            body: left === 0 ? 'Ends today' : `${left} day${left === 1 ? '' : 's'} left · ${email}`,
+            href: hqHref(email),
+            at: `${asDay(billing.trialEndsOn)}T00:00:00.000Z`,
+            sticky: true,
+          })
+        }
+      }
+      const created = asDay(t.user.createdAt)
+      if (created && daysBetween(created, today) <= 2) {
         live.push({
-          id: `hq-follow:${email}:${lead.id}:${lead.nextActionOn}`,
-          title: `${name} · follow-up due`,
-          body: lead.coupleName,
+          id: `hq-new:${email}`,
+          title: `${name} joined`,
+          body: `${email} started a GoldHour desk`,
           href: hqHref(email),
-          at: `${lead.nextActionOn}T08:00:00.000Z`,
+          at: asIso(t.user.createdAt) || created,
           sticky: true,
         })
       }
+      const leads = Array.isArray(t.studio?.leads) ? t.studio.leads : []
+      for (const lead of leads) {
+        if (followDue(lead, today)) {
+          live.push({
+            id: `hq-follow:${email}:${lead.id}:${lead.nextActionOn}`,
+            title: `${name} · follow-up due`,
+            body: lead.coupleName,
+            href: hqHref(email),
+            at: `${lead.nextActionOn}T08:00:00.000Z`,
+            sticky: true,
+          })
+        }
+      }
+    } catch (err) {
+      console.error('goldhour-hq-notice-tenant', t.user?.email, err)
     }
   }
 
-  const audit = fromAudit(
-    opts.audit,
-    (row) => {
-      const t = (row.userId && byUser.get(row.userId)) || (row.studioId && byStudio.get(row.studioId)) || null
-      return hqHref(t?.user.email)
-    },
-    (row) => {
-      const t = (row.userId && byUser.get(row.userId)) || (row.studioId && byStudio.get(row.studioId)) || null
-      const who = t?.studio?.name || t?.user.email || 'Studio'
-      return `${who} · ${LABELS[row.action] || row.action}`
-    },
-  )
+  let audit: AppNotice[] = []
+  try {
+    audit = fromAudit(
+      opts.audit,
+      (row) => {
+        const t = (row.userId && byUser.get(row.userId)) || (row.studioId && byStudio.get(row.studioId)) || null
+        return hqHref(t?.user.email)
+      },
+      (row) => {
+        const t = (row.userId && byUser.get(row.userId)) || (row.studioId && byStudio.get(row.studioId)) || null
+        const who = t?.studio?.name || t?.user.email || 'Studio'
+        return `${who} · ${LABELS[row.action] || row.action}`
+      },
+    )
+  } catch (err) {
+    console.error('goldhour-hq-notice-audit', err)
+  }
 
   return [...live, ...audit].slice(0, 50)
 }

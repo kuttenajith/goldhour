@@ -6,10 +6,10 @@ import { ago, loadReadIds, saveReadIds } from '../lib/noticeRead.ts'
 import type { AppNotice } from '../lib/types.ts'
 import { clsx } from '../lib/clsx.ts'
 
-export function NoticeBell() {
+export function NoticeBell({ extras = [] }: { extras?: AppNotice[] }) {
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
-  const [items, setItems] = useState<AppNotice[]>([])
+  const [fetched, setFetched] = useState<AppNotice[]>([])
   const [read, setRead] = useState<Record<string, true>>(() => loadReadIds())
 
   useEffect(() => {
@@ -17,10 +17,10 @@ export function NoticeBell() {
     function pull() {
       api<{ notices: AppNotice[] }>('/api/notices')
         .then((data) => {
-          if (alive) setItems(data.notices || [])
+          if (alive) setFetched(data.notices || [])
         })
         .catch(() => {
-          if (alive) setItems([])
+          if (alive) setFetched([])
         })
     }
     pull()
@@ -30,6 +30,17 @@ export function NoticeBell() {
       window.clearInterval(tick)
     }
   }, [])
+
+  const items = useMemo(() => {
+    const seen = new Set<string>()
+    const out: AppNotice[] = []
+    for (const notice of [...extras, ...fetched]) {
+      if (!notice?.id || seen.has(notice.id)) continue
+      seen.add(notice.id)
+      out.push(notice)
+    }
+    return out
+  }, [extras, fetched])
 
   const unread = useMemo(() => items.filter((n) => !read[n.id]).length, [items, read])
 

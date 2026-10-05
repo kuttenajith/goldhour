@@ -688,18 +688,22 @@ app.post('/billing/checkout', async (c) => {
     detail: plan.id,
     ip: clientIp(c),
   })
-  await notifyPlanRequest({
-    email: actor.user.email,
-    studio: {
-      name: actor.studio.name,
-      owner: actor.studio.owner,
-      city: actor.studio.city,
-      phone: actor.studio.phone,
-      tagline: actor.studio.tagline,
-    },
-    plan: plan.id,
-    current: sub ? billingStatus(sub).plan : 'trial',
-  })
+  try {
+    await notifyPlanRequest({
+      email: actor.user.email,
+      studio: {
+        name: actor.studio.name,
+        owner: actor.studio.owner,
+        city: actor.studio.city,
+        phone: actor.studio.phone,
+        tagline: actor.studio.tagline,
+      },
+      plan: plan.id,
+      current: sub ? billingStatus(sub).plan : 'trial',
+    })
+  } catch (err) {
+    console.error('goldhour-notify-request', err)
+  }
   const keyId = process.env.RAZORPAY_KEY_ID
   const keySecret = process.env.RAZORPAY_KEY_SECRET
   if (!keyId || !keySecret) {
@@ -829,8 +833,14 @@ app.get('/notices', async (c) => {
   const db = getStore()
   const hq = isAdminEmail(actor.user.email) || actor.user.role === 'hq'
   if (hq) {
-    const [tenants, audit] = await Promise.all([db.listTenants(), billingAwareAudit()])
-    return c.json({ notices: hqNotices({ tenants, audit }) })
+    try {
+      const [tenants, audit] = await Promise.all([db.listTenants(), billingAwareAudit()])
+      const notices = hqNotices({ tenants, audit })
+      return c.json({ notices })
+    } catch (err) {
+      console.error('goldhour-notices', err)
+      return c.json({ notices: [] })
+    }
   }
   const sub = await db.getSub(actor.user.id)
   const audit = await billingAwareAudit(actor.studio.id)

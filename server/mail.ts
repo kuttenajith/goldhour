@@ -4,7 +4,7 @@ const WEB3FORMS_KEY = process.env.WEB3FORMS_ACCESS_KEY || 'e7e8e974-642c-411f-83
 const RESEND_KEY = process.env.RESEND_API_KEY || ''
 const FROM = process.env.MAIL_FROM || 'GoldHour <goldhour@updates.goldhour.app>'
 
-async function withBudget<T>(work: Promise<T>, ms = 3500): Promise<T | null> {
+async function withBudget<T>(work: Promise<T>, ms = 8000): Promise<T | null> {
   return Promise.race([
     work.catch((err) => {
       console.error('goldhour-mail', err)
@@ -43,6 +43,7 @@ async function viaWeb3forms(subject: string, message: string, replyTo = ADMIN_EM
       name: 'GoldHour',
       email: replyTo,
       replyto: replyTo,
+      to: ADMIN_EMAIL,
       botcheck: false,
       kind: 'goldhour',
       message: message.slice(0, 9000),
@@ -55,9 +56,32 @@ async function viaWeb3forms(subject: string, message: string, replyTo = ADMIN_EM
   return ok
 }
 
-/** Always lands in HQ Gmail. Await this — Vercel kills fire-and-forget fetch. */
+async function viaFormsubmit(to: string, subject: string, message: string, replyTo = ADMIN_EMAIL) {
+  const { ok, body } = await postJson(`https://formsubmit.co/ajax/${encodeURIComponent(to)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({
+      _subject: subject,
+      _template: 'box',
+      _captcha: 'false',
+      _replyto: replyTo,
+      name: 'GoldHour',
+      email: replyTo,
+      message,
+    }),
+  })
+  if (!ok) console.error('goldhour-mail-formsubmit', to, body.slice(0, 240))
+  return ok
+}
+
+/** Always tries HQ Gmail directly. Await this — Vercel kills fire-and-forget fetch. */
 export async function mailAdmin(subject: string, message: string, replyTo = ADMIN_EMAIL) {
-  await withBudget(viaWeb3forms(subject, `${message}\n\nApp: ${APP_URL}`, replyTo))
+  const text = `${message}\n\nApp: ${APP_URL}`
+  await Promise.all([
+    withBudget(viaResend(ADMIN_EMAIL, subject, text)),
+    withBudget(viaFormsubmit(ADMIN_EMAIL, subject, text, replyTo)),
+    withBudget(viaWeb3forms(subject, text, replyTo)),
+  ])
 }
 
 /** Photographer inbox when Resend is set; HQ always gets a copy so nothing is silent. */
@@ -66,19 +90,5 @@ export async function mailUser(to: string, subject: string, text: string) {
   const sent = await withBudget(viaResend(to, subject, letter))
   await mailAdmin(`[TO ${to}] ${subject}`, `Send / copy for ${to}\n\n${letter}`, to)
   if (sent) return
-  await withBudget(
-    postJson(`https://formsubmit.co/ajax/${encodeURIComponent(to)}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({
-        _subject: subject,
-        _template: 'box',
-        _captcha: 'false',
-        _replyto: ADMIN_EMAIL,
-        name: 'GoldHour',
-        email: ADMIN_EMAIL,
-        message: letter,
-      }),
-    }).then(() => true),
-  )
+  await withBudget(viaFormsubmit(to, subject, letter))
 }

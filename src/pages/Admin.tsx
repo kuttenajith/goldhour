@@ -10,7 +10,7 @@ import { day, money, paid, PAYMENT_LABEL } from '../lib/format.ts'
 import { firstName } from '../lib/copilot.ts'
 import { api, logoutStudio, useStudio } from '../lib/store.ts'
 import { UserHello } from '../components/UserHello.tsx'
-import type { AdminOverview, AdminTenant, Lead } from '../lib/types.ts'
+import type { AdminOverview, AdminTenant, AppNotice, Lead } from '../lib/types.ts'
 import { clsx } from '../lib/clsx.ts'
 
 type Filter = 'live' | 'paying' | 'trial' | 'request' | 'all'
@@ -228,6 +228,14 @@ export function Admin() {
   const trial = live.filter((t) => t.billing.status === 'trialing')
   const requests = live.filter((t) => Boolean(t.billing.requestedPlan))
   const events = live.reduce((s, t) => s + t.leads.length, 0)
+  const requestNotices: AppNotice[] = requests.map((t) => ({
+    id: `hq-request:${t.email}:${t.billing.requestedPlan}`,
+    title: `${t.studio.name} asked for ${planName(t.billing.requestedPlan)}`,
+    body: `${t.email} · open HQ and switch the desk`,
+    href: `/admin?studio=${encodeURIComponent(t.email)}`,
+    at: t.billing.requestedAt || new Date().toISOString(),
+    sticky: true,
+  }))
 
   const shown = useMemo(() => {
     const needle = q.trim().toLowerCase()
@@ -252,7 +260,7 @@ export function Admin() {
           </span>
         </div>
         <div className="flex items-center gap-3 text-sm">
-          <NoticeBell />
+          <NoticeBell extras={requestNotices} />
           <UserHello name={firstName(me)} />
           <Link to="/studio" className="text-gold-soft">
             My desk

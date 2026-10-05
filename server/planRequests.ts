@@ -30,12 +30,12 @@ export function pendingPlanRequest(opts: {
   )
   const requests = mine.filter((row) => row.action === 'billing.request')
   const grants = mine.filter((row) => row.action === 'billing.activate' || row.action === 'billing.paid')
-  const lastRequest = requests.sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]
+  const lastRequest = requests.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0]
   if (!lastRequest) return null
-  const lastGrant = grants.sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]
-  if (lastGrant && lastGrant.createdAt >= lastRequest.createdAt) return null
+  const lastGrant = grants.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0]
+  if (lastGrant && String(lastGrant.createdAt) >= String(lastRequest.createdAt)) return null
   const plan = asPaidPlan(lastRequest.detail)
   if (!plan) return null
   if (opts.status === 'active' && opts.currentPlan === plan) return null
-  return { plan, at: lastRequest.createdAt }
+  return { plan, at: String(lastRequest.createdAt) }
 }
