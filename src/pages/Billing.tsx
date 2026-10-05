@@ -3,7 +3,9 @@ import { Link } from 'react-router-dom'
 import { BrandMark } from '../components/BrandMark.tsx'
 import { Button } from '../components/Button.tsx'
 import { NoticeBell } from '../components/NoticeBell.tsx'
+import { firstName } from '../lib/copilot.ts'
 import { api, acceptSession, useStudio } from '../lib/store.ts'
+import { UserHello } from '../components/UserHello.tsx'
 import type { StudioSnapshot } from '../lib/types.ts'
 
 declare global {
@@ -30,25 +32,33 @@ const plans = [
 export function Billing() {
   const snap = useStudio()
   const [error, setError] = useState('')
+  const [note, setNote] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
 
   async function pay(plan: string) {
     setError('')
+    setNote('')
     setBusy(plan)
     try {
       const order = await api<{
-        keyId: string
-        orderId: string
-        amount: number
-        name: string
-        description: string
-        email: string
-        phone: string
+        keyId?: string
+        orderId?: string
+        amount?: number
+        name?: string
+        description?: string
+        email?: string
+        phone?: string
+        requested?: boolean
+        message?: string
       }>('/api/billing/checkout', {
         method: 'POST',
         body: JSON.stringify({ plan }),
       })
-      if (!window.Razorpay) {
+      if (order.requested) {
+        setNote(order.message || 'HQ has your request. You can start a paid plan during the trial.')
+        return
+      }
+      if (!window.Razorpay || !order.keyId || !order.orderId || !order.amount) {
         throw new Error('Razorpay checkout did not load. Refresh and try again.')
       }
       const ck = new window.Razorpay({
@@ -86,18 +96,22 @@ export function Billing() {
       <div className="mx-auto max-w-3xl">
         <div className="flex items-center justify-between gap-3">
           <BrandMark />
-          <NoticeBell />
+          <div className="flex items-center gap-3">
+            <NoticeBell />
+            <UserHello name={firstName(snap)} />
+          </div>
         </div>
         <p className="mt-10 text-sm uppercase tracking-[0.12em] text-gold-soft">Billing</p>
-        <h1 className="mt-2 font-display text-5xl">Keep the desk after the trial</h1>
+        <h1 className="mt-2 font-display text-5xl">Subscribe any time</h1>
         <p className="mt-4 max-w-xl text-mute">
           {snap.billing.active
             ? snap.billing.status === 'active'
               ? `Studio plan is active until ${snap.billing.periodEndsOn}.`
-              : `Trial is on until ${snap.billing.trialEndsOn}. Pay any time to keep going.`
+              : `Trial is on until ${snap.billing.trialEndsOn}. Pay now if you want — you do not have to wait for the trial to end.`
             : `Trial ended on ${snap.billing.trialEndsOn}. Pay to open the desk again.`}
         </p>
         {error ? <p className="mt-4 text-sm text-orange-200">{error}</p> : null}
+        {note ? <p className="mt-4 text-sm text-gold-soft">{note}</p> : null}
         <div className="mt-10 grid gap-4 md:grid-cols-2">
           {plans.map((p) => (
             <article key={p.id} className="rounded-3xl border border-line bg-ink-2 p-6">
@@ -108,7 +122,7 @@ export function Billing() {
               </p>
               <p className="mt-3 text-sm text-mute">{p.note}</p>
               <Button className="mt-6 w-full" disabled={busy !== null || snap.isDemo} onClick={() => void pay(p.id)}>
-                {busy === p.id ? 'Opening Razorpay…' : `Pay ${p.price}`}
+                {busy === p.id ? 'Starting…' : snap.billing.status === 'trialing' ? `Start ${p.name} now` : `Pay ${p.price}`}
               </Button>
             </article>
           ))}

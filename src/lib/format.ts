@@ -101,3 +101,10 @@ export function digits(phone: string) {
   if (d.length === 10) return `91${d}`
   return d
 }
+
+export function timeOfDayGreeting(now = new Date()) {
+  const hour = now.getHours()
+  if (hour < 12) return 'Good morning'
+  if (hour < 17) return 'Good afternoon'
+  return 'Good evening'
+}

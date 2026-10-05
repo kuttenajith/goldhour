@@ -5,12 +5,14 @@ import { Button } from '../components/Button.tsx'
 import { PageHeader } from '../components/PageHeader.tsx'
 import { paidOf } from '../lib/booking.ts'
 import { dayPlan } from '../lib/dayPlan.ts'
-import { day, money, paid, todayIso } from '../lib/format.ts'
+import { firstName } from '../lib/copilot.ts'
+import { day, money, paid, timeOfDayGreeting, todayIso } from '../lib/format.ts'
 import { useStudio } from '../lib/store.ts'
 import { clsx } from '../lib/clsx.ts'
 
 export function Dashboard() {
-  const { studio, leads } = useStudio()
+  const snap = useStudio()
+  const { studio, leads } = snap
   const today = todayIso()
   const booked = leads.filter((l) => l.status === 'booked')
   const enquiries = leads.filter((l) => l.status === 'new')
@@ -28,7 +30,7 @@ export function Dashboard() {
     <div className="page-rise space-y-6">
       <PageHeader
         kicker={studio.name}
-        title="Today"
+        title={`Hi ${firstName(snap)}! ${timeOfDayGreeting()}`}
         hint={`${enquiries.length} new · ${booked.length} booked · ${studio.city}`}
         actions={
           priya ? (

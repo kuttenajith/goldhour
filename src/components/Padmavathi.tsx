@@ -82,7 +82,7 @@ export function Padmavathi() {
   return (
     <>
       {open ? (
-        <div className="fixed inset-0 z-[60]">
+        <div className="fixed inset-0 z-[56]">
           <button
             type="button"
             className="absolute inset-0 bg-ink/55 backdrop-blur-[2px]"
@@ -93,7 +93,7 @@ export function Padmavathi() {
             role="dialog"
             aria-modal="true"
             aria-label="Padmavathi"
-            className="absolute bottom-[4.75rem] right-3 flex h-[min(420px,68dvh)] w-[min(100vw-1.5rem,360px)] flex-col overflow-hidden rounded-2xl border border-line bg-ink-2 shadow-[0_24px_80px_rgba(0,0,0,0.5)] sm:right-6"
+            className="absolute bottom-[4.75rem] right-3 flex h-[min(420px,68dvh)] w-[min(100vw-1.5rem,360px)] flex-col overflow-hidden rounded-2xl border border-line bg-ink-2 shadow-[0_24px_80px_rgba(0,0,0,0.5)] sm:right-6 z-[56]"
           >
             <div className="flex items-center justify-between border-b border-line px-4 py-3">
               <div>
@@ -154,11 +154,18 @@ export function Padmavathi() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="fixed bottom-4 right-3 z-[70] inline-flex min-h-11 items-center gap-2 rounded-full bg-gold px-3.5 text-sm font-medium text-ink shadow-lg hover:bg-gold-soft sm:bottom-6 sm:right-6"
+        className={clsx(
+          'group/fab fixed bottom-4 right-3 z-[55] inline-flex h-12 items-center justify-center overflow-hidden rounded-full bg-gold text-sm font-medium text-ink shadow-lg hover:bg-gold-soft sm:bottom-6 sm:right-6',
+          open ? 'w-12' : 'w-12 hover:w-auto hover:gap-2 hover:px-4 focus-visible:w-auto focus-visible:gap-2 focus-visible:px-4',
+        )}
         aria-label={open ? 'Close Padmavathi' : 'Open Padmavathi'}
       >
-        {open ? <X size={16} /> : <MessageCircle size={16} />}
-        Padmavathi
+        {open ? <X size={18} /> : <MessageCircle size={18} />}
+        {open ? null : (
+          <span className="max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-all group-hover/fab:max-w-[8rem] group-hover/fab:opacity-100 group-focus-visible/fab:max-w-[8rem] group-focus-visible/fab:opacity-100">
+            Padmavathi
+          </span>
+        )}
       </button>
     </>
   )

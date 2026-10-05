@@ -7,7 +7,9 @@ import { SiteVisits } from '../components/SiteVisits.tsx'
 import { StatusPill } from '../components/StatusPill.tsx'
 import { fieldClass } from '../components/Field.tsx'
 import { day, money, paid, PAYMENT_LABEL } from '../lib/format.ts'
+import { firstName } from '../lib/copilot.ts'
 import { api, logoutStudio, useStudio } from '../lib/store.ts'
+import { UserHello } from '../components/UserHello.tsx'
 import type { AdminOverview, AdminTenant, Lead } from '../lib/types.ts'
 import { clsx } from '../lib/clsx.ts'
 
@@ -70,14 +72,34 @@ function LeadBlock({ lead }: { lead: Lead }) {
   )
 }
 
-function StudioCard({ tenant, startsOpen }: { tenant: AdminTenant; startsOpen?: boolean }) {
+function StudioCard({
+  tenant,
+  startsOpen,
+  onRefresh,
+}: {
+  tenant: AdminTenant
+  startsOpen?: boolean
+  onRefresh?: () => void
+}) {
   const [open, setOpen] = useState(Boolean(startsOpen))
+  const [planBusy, setPlanBusy] = useState<string | null>(null)
   useEffect(() => {
     if (startsOpen) setOpen(true)
   }, [startsOpen])
   const booked = tenant.leads.filter((l) => l.status === 'booked' || l.status === 'accepted')
   const collected = tenant.leads.reduce((s, l) => s + paid(l), 0)
   const label = tenant.isAdmin ? 'HQ' : tenant.isDemo ? 'Demo' : tenant.billing.status === 'active' ? 'Paying' : tenant.billing.status === 'trialing' ? 'Trial' : 'Expired'
+  const canActivate = !tenant.isAdmin && !tenant.isDemo && tenant.billing.status !== 'active'
+
+  async function activate(plan: 'studio' | 'studio_pro') {
+    setPlanBusy(plan)
+    try {
+      await api('/api/admin/activate-plan', { method: 'POST', body: JSON.stringify({ email: tenant.email, plan }) })
+      onRefresh?.()
+    } finally {
+      setPlanBusy(null)
+    }
+  }
   return (
     <section className="rounded-3xl border border-line bg-ink-2" data-studio={tenant.email}>
       <button type="button" className="flex w-full flex-col gap-3 p-5 text-left sm:flex-row sm:items-center sm:justify-between" onClick={() => setOpen((v) => !v)}>
@@ -99,6 +121,26 @@ function StudioCard({ tenant, startsOpen }: { tenant: AdminTenant; startsOpen?: 
             Phone {tenant.studio.phone || '—'} · Plan {tenant.billing.plan} · Trial until {tenant.billing.trialEndsOn || '—'}
             {tenant.billing.periodEndsOn ? ` · Paid through ${tenant.billing.periodEndsOn}` : ''}
           </p>
+          {canActivate ? (
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                className="rounded-full border border-gold/35 px-3 py-1.5 text-xs text-gold-soft disabled:opacity-50"
+                disabled={planBusy !== null}
+                onClick={() => void activate('studio')}
+              >
+                {planBusy === 'studio' ? 'Starting…' : 'Start Studio now'}
+              </button>
+              <button
+                type="button"
+                className="rounded-full border border-gold/35 px-3 py-1.5 text-xs text-gold-soft disabled:opacity-50"
+                disabled={planBusy !== null}
+                onClick={() => void activate('studio_pro')}
+              >
+                {planBusy === 'studio_pro' ? 'Starting…' : 'Start Pro now'}
+              </button>
+            </div>
+          ) : null}
           <p className="text-xs uppercase tracking-[0.2em] text-mute">
             {booked.length} booked / accepted · {tenant.quotations.length} quotes
           </p>
@@ -124,10 +166,14 @@ export function Admin() {
   const [q, setQ] = useState('')
   const [filter, setFilter] = useState<Filter>('live')
 
-  useEffect(() => {
+  function loadHq() {
     api<AdminOverview>('/api/admin/overview')
       .then(setData)
       .catch((err) => setError(err instanceof Error ? err.message : 'Could not load HQ'))
+  }
+
+  useEffect(() => {
+    loadHq()
   }, [])
 
   useEffect(() => {
@@ -170,7 +216,7 @@ export function Admin() {
         </div>
         <div className="flex items-center gap-3 text-sm">
           <NoticeBell />
-          <span className="hidden text-mute sm:inline">{me.email || 'ajithkutten1998@gmail.com'}</span>
+          <UserHello name={firstName(me)} />
           <Link to="/studio" className="text-gold-soft">
             My desk
           </Link>
@@ -254,7 +300,7 @@ export function Admin() {
         <div className="space-y-4">
           {data && shown.length === 0 ? <p className="text-mute">No studios match that filter.</p> : null}
           {shown.map((tenant) => (
-            <StudioCard key={tenant.email} tenant={tenant} startsOpen={focus === tenant.email} />
+            <StudioCard key={tenant.email} tenant={tenant} startsOpen={focus === tenant.email} onRefresh={loadHq} />
           ))}
         </div>
       </main>

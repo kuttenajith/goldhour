@@ -12,6 +12,8 @@ const LABELS: Record<string, string> = {
   'login.demo': 'Opened the demo desk',
   'studio.update': 'Updated the desk',
   'billing.checkout': 'Opened checkout',
+  'billing.request': 'Asked to start a paid plan',
+  'billing.activate': 'HQ started a paid plan',
   'billing.paid': 'Paid for GoldHour',
   'password.forgot': 'Asked for a password reset',
   'password.reset': 'Changed password',

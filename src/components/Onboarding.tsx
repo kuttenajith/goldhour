@@ -42,7 +42,7 @@ export function Onboarding() {
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/70 p-3 sm:items-center">
+    <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/70 p-3 sm:items-center">
       <div className="w-full max-w-lg gold-ring rounded-3xl bg-ink-2 p-6">
         <p className="text-xs uppercase tracking-[0.22em] text-gold-soft">
           How one wedding runs · {step + 1} / {steps.length}

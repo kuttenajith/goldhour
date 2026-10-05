@@ -15,6 +15,8 @@ const LABELS: Record<string, string> = {
   'email.verified': 'Email confirmed',
   'studio.update': 'Desk updated',
   'billing.checkout': 'Checkout started',
+  'billing.request': 'Asked to start a paid plan',
+  'billing.activate': 'HQ started a paid plan',
   'billing.paid': 'Subscription paid',
   'billing.bad_signature': 'Payment rejected',
   'demo.reset': 'Demo reset',

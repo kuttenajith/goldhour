@@ -39,7 +39,7 @@ import {
   notifyStudioSignup,
   notifyTrialWelcome,
 } from './notify.ts'
-import { PLANS, billingStatus, trialEnd, type PaidPlanId } from './plans.ts'
+import { PLANS, addDays, billingStatus, todayIso, trialEnd, type PaidPlanId } from './plans.ts'
 import { emailOk, passwordOk, studioPayloadTooLarge, validateLeads, validateQuotations, validateStudioProfile } from './validate.ts'
 
 type Jwt = { sub: string; sid?: string; demo?: boolean }
@@ -640,10 +640,30 @@ app.post('/billing/checkout', async (c) => {
   const keyId = process.env.RAZORPAY_KEY_ID
   const keySecret = process.env.RAZORPAY_KEY_SECRET
   if (!keyId || !keySecret) {
-    return c.json(
-      { error: 'Payments are not open yet. Your 14-day trial still works.' },
-      503,
-    )
+    await audit({
+      action: 'billing.request',
+      userId: actor.user.id,
+      studioId: actor.studio.id,
+      detail: plan.id,
+      ip: clientIp(c),
+    })
+    await notifySimple({
+      email: actor.user.email,
+      studio: {
+        name: actor.studio.name,
+        owner: actor.studio.owner,
+        city: actor.studio.city,
+        phone: actor.studio.phone,
+        tagline: actor.studio.tagline,
+      },
+      subject: `[GOLDHOUR PLAN] ${actor.studio.name} wants ${plan.name} now`,
+      detail: `They asked to start ${plan.name} (${plan.label} / month) now. They do not have to wait for the trial to end. Card checkout is not connected yet (Razorpay keys missing).`,
+    })
+    return c.json({
+      requested: true,
+      message:
+        'You can start a paid plan during the trial. Card checkout is not live yet — HQ has your request and can switch the desk now.',
+    })
   }
   const receipt = `gh_${newId().replace(/-/g, '').slice(0, 32)}`
   const auth = Buffer.from(`${keyId}:${keySecret}`).toString('base64')
@@ -698,7 +718,7 @@ app.post('/billing/confirm', async (c) => {
   const actor = await actorFrom(c)
   if (!actor) return c.json({ error: 'Sign in required' }, 401)
   const secret = process.env.RAZORPAY_KEY_SECRET
-  if (!secret) return c.json({ error: 'Payments are not open yet.' }, 503)
+  if (!secret) return c.json({ error: 'Card checkout is not connected yet. Ask HQ to start your plan now.' }, 503)
   const body = await readJson<{
     razorpay_order_id?: string
     razorpay_payment_id?: string
@@ -845,6 +865,43 @@ app.get('/admin/audit', async (c) => {
       studioId: r.studioId,
     })),
   })
+})
+
+app.post('/admin/activate-plan', async (c) => {
+  const actor = await actorFrom(c)
+  if (!actor) return c.json({ error: 'Sign in required' }, 401)
+  if (!isAdminEmail(actor.user.email) && actor.user.role !== 'hq') {
+    return c.json({ error: "You don't have permission to perform this action." }, 403)
+  }
+  const body = await readJson<{ email?: string; plan?: string }>(c)
+  const plan = PLANS[body.plan as PaidPlanId]
+  const email = (body.email || '').trim().toLowerCase()
+  if (!plan || !email) return c.json({ error: 'Pick a studio and a plan.' }, 400)
+  const db = getStore()
+  const user = await db.findUserByEmail(email)
+  if (!user) return c.json({ error: 'Studio not found.' }, 404)
+  if (isAdminEmail(user.email) || user.email === DEMO_EMAIL) {
+    return c.json({ error: 'HQ and the demo desk stay free.' }, 400)
+  }
+  const studio = await db.getStudio(user.id)
+  const sub = await db.getSub(user.id)
+  if (!studio || !sub) return c.json({ error: 'Studio not found.' }, 404)
+  await db.upsertSub({
+    ...sub,
+    plan: plan.id,
+    status: 'active',
+    razorpayPaymentId: sub.razorpayPaymentId || 'hq-activate',
+    periodEndsOn: addDays(todayIso(), plan.days),
+  })
+  await notifyPaid(studio, user.email, plan.id, plan.amountPaise)
+  await audit({
+    action: 'billing.activate',
+    userId: actor.user.id,
+    studioId: studio.id,
+    detail: `${email}:${plan.id}`,
+    ip: clientIp(c),
+  })
+  return c.json({ ok: true })
 })
 
 export default app
