@@ -9,6 +9,7 @@ import { clsx } from '../lib/clsx.ts'
 export function NoticeBell({ extras = [] }: { extras?: AppNotice[] }) {
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
+  const [unreadOnly, setUnreadOnly] = useState(false)
   const [fetched, setFetched] = useState<AppNotice[]>([])
   const [read, setRead] = useState<Record<string, true>>(() => loadReadIds())
 
@@ -39,10 +40,11 @@ export function NoticeBell({ extras = [] }: { extras?: AppNotice[] }) {
       seen.add(notice.id)
       out.push(notice)
     }
-    return out
+    return out.sort((a, b) => String(b.at).localeCompare(String(a.at)))
   }, [extras, fetched])
 
   const unread = useMemo(() => items.filter((n) => !read[n.id]).length, [items, read])
+  const shown = unreadOnly ? items.filter((n) => !read[n.id]) : items
 
   function persist(next: Record<string, true>) {
     setRead(next)
@@ -82,19 +84,32 @@ export function NoticeBell({ extras = [] }: { extras?: AppNotice[] }) {
           <div
             role="dialog"
             aria-label="Notifications"
-            className="absolute right-0 top-12 z-[46] w-[min(100vw-2rem,360px)] overflow-hidden rounded-2xl border border-line bg-ink-2 shadow-[0_24px_80px_rgba(0,0,0,0.45)]"
+            className="absolute right-0 top-12 z-[46] w-[min(100vw-1.5rem,28rem)] overflow-hidden rounded-2xl border border-line bg-ink-2 shadow-[0_24px_80px_rgba(0,0,0,0.45)]"
           >
-            <div className="flex items-center justify-between border-b border-line px-4 py-3">
-              <p className="text-xs uppercase tracking-[0.18em] text-gold-soft">Updates</p>
-              {unread > 0 ? (
-                <button type="button" className="text-xs text-mute hover:text-cream" onClick={markAll}>
-                  Mark all read
+            <div className="flex items-center justify-between gap-2 border-b border-line px-4 py-3">
+              <p className="text-xs uppercase tracking-[0.18em] text-gold-soft">
+                Updates · {shown.length}/{items.length}
+              </p>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  className={clsx('text-xs', unreadOnly ? 'text-gold-soft' : 'text-mute hover:text-cream')}
+                  onClick={() => setUnreadOnly((v) => !v)}
+                >
+                  {unreadOnly ? 'Show all' : 'Unread only'}
                 </button>
-              ) : null}
+                {unread > 0 ? (
+                  <button type="button" className="text-xs text-mute hover:text-cream" onClick={markAll}>
+                    Mark all read
+                  </button>
+                ) : null}
+              </div>
             </div>
-            <ul className="max-h-[min(70dvh,420px)] overflow-y-auto">
-              {items.length === 0 ? <li className="px-4 py-6 text-sm text-mute">No updates yet.</li> : null}
-              {items.map((n) => (
+            <ul className="max-h-[min(75dvh,32rem)] overflow-y-auto">
+              {shown.length === 0 ? (
+                <li className="px-4 py-6 text-sm text-mute">{unreadOnly ? 'No unread updates.' : 'No updates yet.'}</li>
+              ) : null}
+              {shown.map((n) => (
                 <li key={n.id} className="border-t border-line first:border-t-0">
                   <button
                     type="button"
@@ -109,7 +124,7 @@ export function NoticeBell({ extras = [] }: { extras?: AppNotice[] }) {
                     />
                     <span className="min-w-0 flex-1">
                       <span className="block text-sm font-medium">{n.title}</span>
-                      <span className="mt-0.5 block text-xs text-mute">{n.body}</span>
+                      <span className="mt-1 block whitespace-pre-wrap text-xs leading-relaxed text-mute">{n.body}</span>
                     </span>
                     <span className="shrink-0 text-[11px] tabular-nums text-mute">{ago(n.at)}</span>
                   </button>

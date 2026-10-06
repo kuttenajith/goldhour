@@ -3,7 +3,7 @@ import { day, money, PAYMENT_LABEL, SERVICE_LABEL, SOURCE_LABEL, STATUS_LABEL } 
 import { APP_URL, isAdminEmail } from './constants.ts'
 import { getStore } from './db.ts'
 import { mailAdmin, mailUser, noticeCardHtml } from './mail.ts'
-import { hqPlanRequestId } from './notices.ts'
+import { hqLeadNoticeId, hqPlanRequestId } from './notices.ts'
 import { demoFollowLetter, trialWelcomeLetter } from './letters.ts'
 
 export { isAdminEmail }
@@ -41,6 +41,7 @@ export function formatLead(lead: Lead) {
     .join('\n')
   return [
     `Couple: ${lead.coupleName}`,
+    `Entered: ${lead.createdOn ? day(lead.createdOn) : '—'}`,
     `Phone: ${lead.phone || '—'}`,
     `Wedding date: ${lead.eventDate ? day(lead.eventDate) : '—'} (${lead.eventDate || '—'})`,
     `Venue: ${lead.venue || '—'}`,
@@ -201,7 +202,27 @@ export async function notifyLeadChanges(opts: {
   }
 
   const headline = added[0]?.coupleName || changed[0]?.coupleName || removed[0]?.coupleName || opts.studio.name
-  await notifyHq(`[GOLDHOUR EVENT] ${opts.studio.name} · ${headline}`, blocks.join('\n'), opts.email)
+  const cards = [
+    ...added.map((lead) => ({
+      title: `${opts.studio.name} · new enquiry · ${lead.coupleName}`,
+      body: formatLead(lead),
+      href: `/admin?studio=${encodeURIComponent(opts.email)}`,
+    })),
+    ...changed.map((lead) => ({
+      title: `${opts.studio.name} · updated · ${lead.coupleName}`,
+      body: formatLead(lead),
+      href: `/admin?studio=${encodeURIComponent(opts.email)}`,
+    })),
+  ]
+  const ok = await notifyHq(
+    `[GOLDHOUR] ${opts.studio.name} · ${headline}`,
+    blocks.join('\n'),
+    opts.email,
+    cards.length ? noticeCardHtml(cards) : undefined,
+  )
+  if (ok) {
+    await getStore().claimUnmailed(added.map((lead) => hqLeadNoticeId(opts.email, lead.id)))
+  }
 }
 
 export async function notifyPlanRequest(opts: {

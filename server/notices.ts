@@ -13,6 +13,9 @@ const LABELS: Record<string, string> = {
   'login.ok': 'Signed in',
   'login.demo': 'Opened the demo desk',
   'studio.update': 'Updated the desk',
+  'lead.create': 'New enquiry',
+  'lead.update': 'Updated an enquiry',
+  'lead.remove': 'Removed an enquiry',
   'billing.checkout': 'Opened checkout',
   'billing.request': 'Asked to start a paid plan',
   'billing.activate': 'HQ started a paid plan',
@@ -68,6 +71,23 @@ export function hqPlanRequestId(email: string, plan: string) {
   return `hq-request:${email}:${plan}`
 }
 
+function leadSummary(lead: Lead) {
+  return [
+    lead.phone || 'no phone',
+    lead.eventDate ? `wedding ${lead.eventDate}` : 'date pending',
+    lead.venue || lead.city || 'venue pending',
+    lead.budget ? `budget ₹${lead.budget}` : '',
+    lead.notes ? lead.notes.slice(0, 160) : '',
+    lead.createdOn ? `entered ${lead.createdOn}` : '',
+  ]
+    .filter(Boolean)
+    .join(' · ')
+}
+
+export function hqLeadNoticeId(email: string, leadId: string) {
+  return `hq-lead:${email}:${leadId}`
+}
+
 function liveStudio(leads: Lead[], billing: { status: string; trialEndsOn: string }, pro: boolean): AppNotice[] {
   const today = todayIso()
   const items: AppNotice[] = []
@@ -116,10 +136,18 @@ function liveStudio(leads: Lead[], billing: { status: string; trialEndsOn: strin
       items.push({
         id: `new:${lead.id}`,
         title: `New enquiry · ${lead.coupleName}`,
-        body: [lead.venue || lead.city, lead.phone].filter(Boolean).join(' · ') || 'Open the lead',
+        body: leadSummary(lead),
         href: `/studio/leads/${lead.id}`,
         at: lead.createdOn || today,
         sticky: true,
+      })
+    } else {
+      items.push({
+        id: `lead:${lead.id}`,
+        title: `${lead.coupleName} · ${lead.status.replace(/_/g, ' ')}`,
+        body: leadSummary(lead),
+        href: `/studio/leads/${lead.id}`,
+        at: lead.createdOn || today,
       })
     }
     if (lead.status === 'booked' && lead.eventDate && daysBetween(today, lead.eventDate) <= 1 && daysBetween(today, lead.eventDate) >= 0) {
@@ -210,7 +238,7 @@ export function studioNotices(opts: {
     (row) => studioHref(row.action),
     (row) => LABELS[row.action] || row.action,
   )
-  return [...live, ...audit].slice(0, 40)
+  return [...live, ...audit].sort((a, b) => String(b.at).localeCompare(String(a.at))).slice(0, 200)
 }
 
 export function hqNotices(opts: { tenants: TenantPublic[]; audit: AuditRow[] }): AppNotice[] {
@@ -270,17 +298,35 @@ export function hqNotices(opts: { tenants: TenantPublic[]; audit: AuditRow[] }):
         })
       }
       const leads = Array.isArray(t.studio?.leads) ? t.studio.leads : []
+      const quotes = Array.isArray(t.studio?.quotations) ? t.studio.quotations : []
       for (const lead of leads) {
+        live.push({
+          id: hqLeadNoticeId(email, lead.id),
+          title: `${name} · ${lead.status === 'new' ? 'new enquiry' : lead.status.replace(/_/g, ' ')} · ${lead.coupleName}`,
+          body: leadSummary(lead),
+          href: hqHref(email),
+          at: lead.createdOn || asIso(t.user.createdAt) || today,
+          sticky: lead.status === 'new',
+        })
         if (followDue(lead, today)) {
           live.push({
             id: `hq-follow:${email}:${lead.id}:${lead.nextActionOn}`,
             title: `${name} · follow-up due`,
-            body: lead.coupleName,
+            body: `${lead.coupleName} · ${leadSummary(lead)}`,
             href: hqHref(email),
             at: `${lead.nextActionOn}T08:00:00.000Z`,
             sticky: true,
           })
         }
+      }
+      for (const quote of quotes) {
+        live.push({
+          id: `hq-quote:${email}:${quote.id}`,
+          title: `${name} · quotation · ${quote.packageName}`,
+          body: `₹${quote.amount}${quote.notes ? ` · ${quote.notes.slice(0, 120)}` : ''} · ${quote.createdOn || ''}`,
+          href: hqHref(email),
+          at: quote.createdOn || today,
+        })
       }
     } catch (err) {
       console.error('goldhour-hq-notice-tenant', t.user?.email, err)
@@ -305,5 +351,5 @@ export function hqNotices(opts: { tenants: TenantPublic[]; audit: AuditRow[] }):
     console.error('goldhour-hq-notice-audit', err)
   }
 
-  return [...live, ...audit].slice(0, 50)
+  return [...live, ...audit].sort((a, b) => String(b.at).localeCompare(String(a.at))).slice(0, 200)
 }

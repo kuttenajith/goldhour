@@ -8,15 +8,9 @@ function shouldMail(notice: AppNotice) {
   if (notice.id.startsWith('hq-')) return true
   const blob = `${notice.title} ${notice.body}`.toLowerCase()
   if (blob.includes('signed in')) return false
-  if (blob.includes('updated the desk')) return false
   if (blob.includes('opened the demo')) return false
-  if (blob.includes('asked for')) return true
-  if (blob.includes('trial')) return true
-  if (blob.includes('joined')) return true
-  if (blob.includes('paid')) return true
-  if (blob.includes('request')) return true
-  if (blob.includes('started a 14-day')) return true
-  return false
+  if (blob.includes('updated the desk') && !blob.includes('enquiry')) return false
+  return true
 }
 
 function asText(notice: AppNotice) {

@@ -27,7 +27,7 @@ import {
   webhookSignature,
 } from './crypto.ts'
 import { emptyStudio, getStore, type AuditRow, type UserRow } from './db.ts'
-import { mailUser } from './mail.ts'
+import { mailDirect, mailUser } from './mail.ts'
 import { hqNotices, studioNotices } from './notices.ts'
 import { mailNewHqNotices } from './noticeMail.ts'
 import {
@@ -42,6 +42,7 @@ import {
   notifyStudioSignup,
   notifyTrialWelcome,
 } from './notify.ts'
+import { indiaMobile, newOtpCode, otpHash, sendOtpSms } from './otp.ts'
 import { pendingPlanRequest } from './planRequests.ts'
 import { PLANS, addDays, billingStatus, todayIso, trialEnd, type PaidPlanId } from './plans.ts'
 import { emailOk, passwordOk, studioPayloadTooLarge, validateLeads, validateQuotations, validateStudioProfile } from './validate.ts'
@@ -248,7 +249,7 @@ async function ensureHq(userId: string) {
 async function billingAwareAudit(studioId?: string) {
   const db = getStore()
   const [recent, billing] = await Promise.all([
-    db.listAudit({ studioId, limit: studioId ? 40 : 150 }),
+    db.listAudit({ studioId, limit: studioId ? 80 : 300 }),
     db.listAudit({ studioId, limit: 400, actionPrefix: 'billing.' }),
   ])
   const seen = new Set<string>()
@@ -289,6 +290,66 @@ app.onError((err, c) => {
   return c.json({ error: 'Something went wrong. Try again.', errorId: id }, 500)
 })
 
+app.post('/auth/otp/send', async (c) => {
+  const ip = clientIp(c)
+  if (await lockedOut('otp', ip)) {
+    return c.json({ error: 'Too many OTP attempts. Wait 15 minutes.' }, 429)
+  }
+  const body = await readJson<{ phone?: string; email?: string }>(c)
+  const mobile = indiaMobile(body.phone || '')
+  const email = (body.email || '').trim().toLowerCase()
+  if (!mobile) return c.json({ error: 'Enter a 10-digit Indian mobile number.' }, 400)
+  if (!emailOk(email)) return c.json({ error: 'Enter the studio email first so we can also send the code there.' }, 400)
+  const db = getStore()
+  const existing = await db.getPhoneOtp(mobile)
+  if (existing && Date.now() - new Date(existing.sentAt).getTime() < 45_000) {
+    return c.json({ error: 'Wait a minute before requesting another code.' }, 429)
+  }
+  const code = newOtpCode()
+  const now = new Date()
+  await db.putPhoneOtp({
+    phone: mobile,
+    codeHash: otpHash(mobile, code),
+    expiresAt: new Date(now.getTime() + 10 * 60 * 1000).toISOString(),
+    verifiedAt: null,
+    sentAt: now.toISOString(),
+    tries: 0,
+  })
+  await db.recordAuthAttempt(email, ip, true)
+  const sms = await sendOtpSms(mobile, code)
+  const mailed = await mailDirect(
+    email,
+    'GoldHour mobile code',
+    `Your GoldHour confirmation code is ${code}. It is valid for 10 minutes.\n\nIf you did not ask for this, ignore it.`,
+  )
+  if (!sms && !mailed) {
+    return c.json({ error: 'Could not send the code. Check the number and email, then try again.' }, 502)
+  }
+  return c.json({ ok: true, sms })
+})
+
+app.post('/auth/otp/verify', async (c) => {
+  const body = await readJson<{ phone?: string; code?: string }>(c)
+  const mobile = indiaMobile(body.phone || '')
+  const code = (body.code || '').replace(/\D/g, '').slice(0, 6)
+  if (!mobile || code.length !== 6) return c.json({ error: 'Enter the 6-digit code.' }, 400)
+  const db = getStore()
+  const row = await db.getPhoneOtp(mobile)
+  if (!row) return c.json({ error: 'Send the code first.' }, 400)
+  if (row.tries >= 5) return c.json({ error: 'Too many tries. Send a new code.' }, 429)
+  if (new Date(row.expiresAt).getTime() < Date.now()) {
+    return c.json({ error: 'That code expired. Send a new one.' }, 400)
+  }
+  const match = row.codeHash === otpHash(mobile, code)
+  await db.putPhoneOtp({
+    ...row,
+    tries: row.tries + 1,
+    verifiedAt: match ? new Date().toISOString() : row.verifiedAt,
+  })
+  if (!match) return c.json({ error: 'That code is not right.' }, 400)
+  return c.json({ ok: true })
+})
+
 app.post('/auth/register', async (c) => {
   const ip = clientIp(c)
   if (await lockedOut('signup', ip)) {
@@ -314,9 +375,17 @@ app.post('/auth/register', async (c) => {
   if (!isAdminEmail(email) && (owner.length < 2 || city.length < 2 || phone.replace(/\D/g, '').length < 10)) {
     return c.json({ error: 'Owner, city, and a 10-digit phone are required.' }, 400)
   }
-  await getStore().recordAuthAttempt(email, ip, true)
   const db = getStore()
   const admin = isAdminEmail(email)
+  if (!admin) {
+    const mobile = indiaMobile(phone)
+    const otp = mobile ? await db.getPhoneOtp(mobile) : null
+    const verified = Boolean(otp?.verifiedAt && new Date(otp.verifiedAt).getTime() > Date.now() - 30 * 60 * 1000)
+    if (!verified) {
+      return c.json({ error: 'Confirm the mobile number with the OTP first.' }, 400)
+    }
+  }
+  await db.recordAuthAttempt(email, ip, true)
   const user: UserRow = {
     id: newId(),
     email,
@@ -598,15 +667,24 @@ app.put('/studio', async (c) => {
     quotationsBefore: current.quotations || [],
     quotationsAfter: nextQuotes,
   })
-  const added = nextLeads.filter((l) => !(current.leads || []).some((p) => p.id === l.id)).length
-  const removed = (current.leads || []).filter((l) => !nextLeads.some((n) => n.id === l.id)).length
+  const addedLeads = nextLeads.filter((l) => !(current.leads || []).some((p) => p.id === l.id))
+  const removedLeads = (current.leads || []).filter((l) => !nextLeads.some((n) => n.id === l.id))
   await audit({
     action: 'studio.update',
     userId: actor.user.id,
     studioId: current.id,
     ip: clientIp(c),
-    detail: `leads ${nextLeads.length} (+${added}/-${removed}) quotes ${nextQuotes.length}`,
+    detail: `leads ${nextLeads.length} (+${addedLeads.length}/-${removedLeads.length}) quotes ${nextQuotes.length}`,
   })
+  for (const lead of addedLeads) {
+    await audit({
+      action: 'lead.create',
+      userId: actor.user.id,
+      studioId: current.id,
+      ip: clientIp(c),
+      detail: `${lead.coupleName} · ${lead.phone || 'no phone'} · ${lead.eventDate || 'date pending'} · entered ${lead.createdOn || todayIso()}`,
+    })
+  }
   return c.json(await snapshot(actor.user.id))
 })
 

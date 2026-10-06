@@ -81,6 +81,15 @@ export type OrderRow = {
   createdAt: string
 }
 
+export type PhoneOtpRow = {
+  phone: string
+  codeHash: string
+  expiresAt: string
+  verifiedAt: string | null
+  sentAt: string
+  tries: number
+}
+
 export type TenantPublic = {
   user: { id: string; email: string; createdAt: string }
   studio: StudioRow | null
@@ -115,6 +124,8 @@ export type Store = {
   listAudit(opts: { studioId?: string; limit?: number; actionPrefix?: string }): Promise<AuditRow[]>
   claimUnmailed(ids: string[]): Promise<string[]>
   releaseMailed(ids: string[]): Promise<void>
+  putPhoneOtp(row: PhoneOtpRow): Promise<void>
+  getPhoneOtp(phone: string): Promise<PhoneOtpRow | null>
 }
 
 function mapUser(row: Partial<UserRow> & { id: string; email: string; passwordHash?: string; password_hash?: string; createdAt?: string; created_at?: string; emailVerifiedAt?: string | null; email_verified_at?: string | null; role?: string }): UserRow {
@@ -215,6 +226,7 @@ type FileShape = {
   tokens: TokenRow[]
   audit: AuditRow[]
   mailed: string[]
+  otps: PhoneOtpRow[]
 }
 
 function fileStore(path: string): Store {
@@ -228,6 +240,7 @@ function fileStore(path: string): Store {
     tokens: [],
     audit: [],
     mailed: [],
+    otps: [],
   })
 
   function read(): FileShape {
@@ -422,6 +435,15 @@ function fileStore(path: string): Store {
       db.mailed = (db.mailed || []).filter((id) => !drop.has(id))
       write(db)
     },
+    async putPhoneOtp(row) {
+      const db = read()
+      db.otps = (db.otps || []).filter((item) => item.phone !== row.phone)
+      db.otps.push(row)
+      write(db)
+    },
+    async getPhoneOtp(phone) {
+      return (read().otps || []).find((item) => item.phone === phone) ?? null
+    },
   }
   return store
 }
@@ -508,6 +530,14 @@ function postgresStore(url: string): Store {
       await sql`CREATE TABLE IF NOT EXISTS mailed_notices (
         id text PRIMARY KEY,
         sent_at timestamptz NOT NULL DEFAULT now()
+      )`
+      await sql`CREATE TABLE IF NOT EXISTS phone_otps (
+        phone text PRIMARY KEY,
+        code_hash text NOT NULL,
+        expires_at timestamptz NOT NULL,
+        verified_at timestamptz,
+        sent_at timestamptz NOT NULL,
+        tries integer NOT NULL DEFAULT 0
       )`
     },
     async findUserByEmail(email) {
@@ -685,6 +715,28 @@ function postgresStore(url: string): Store {
       for (const id of ids) {
         if (!id) continue
         await sql`DELETE FROM mailed_notices WHERE id = ${id}`
+      }
+    },
+    async putPhoneOtp(row) {
+      await sql`INSERT INTO phone_otps (phone, code_hash, expires_at, verified_at, sent_at, tries)
+        VALUES (${row.phone}, ${row.codeHash}, ${row.expiresAt}, ${row.verifiedAt}, ${row.sentAt}, ${row.tries})
+        ON CONFLICT (phone) DO UPDATE SET
+          code_hash = excluded.code_hash,
+          expires_at = excluded.expires_at,
+          verified_at = excluded.verified_at,
+          sent_at = excluded.sent_at,
+          tries = excluded.tries`
+    },
+    async getPhoneOtp(phone) {
+      const rows = await sql`SELECT phone, code_hash AS "codeHash", expires_at AS "expiresAt", verified_at AS "verifiedAt", sent_at AS "sentAt", tries FROM phone_otps WHERE phone = ${phone}`
+      const row = rows[0] as PhoneOtpRow | undefined
+      if (!row) return null
+      return {
+        ...row,
+        expiresAt: String(row.expiresAt),
+        verifiedAt: row.verifiedAt ? String(row.verifiedAt) : null,
+        sentAt: String(row.sentAt),
+        tries: Number(row.tries || 0),
       }
     },
   }

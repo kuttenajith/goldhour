@@ -7,7 +7,7 @@ import { DeskSession } from '../components/TabGuard.tsx'
 import { SiteVisits } from '../components/SiteVisits.tsx'
 import { StatusPill } from '../components/StatusPill.tsx'
 import { fieldClass } from '../components/Field.tsx'
-import { day, money, paid, PAYMENT_LABEL } from '../lib/format.ts'
+import { day, money, paid, PAYMENT_LABEL, SERVICE_LABEL, SOURCE_LABEL } from '../lib/format.ts'
 import { firstName } from '../lib/copilot.ts'
 import { api, logoutStudio, useStudio } from '../lib/store.ts'
 import { UserHello } from '../components/UserHello.tsx'
@@ -39,7 +39,7 @@ function LeadBlock({ lead }: { lead: Lead }) {
         <span>
           <span className="block font-medium">{lead.coupleName}</span>
           <span className="text-xs text-mute">
-            {day(lead.eventDate)} · {lead.venue || lead.city || 'Venue pending'} · {lead.phone || 'no phone'}
+            Entered {day(lead.createdOn)} · Wedding {day(lead.eventDate)} · {lead.venue || lead.city || 'Venue pending'} · {lead.phone || 'no phone'}
           </span>
         </span>
         <StatusPill status={lead.status} />
@@ -50,6 +50,10 @@ function LeadBlock({ lead }: { lead: Lead }) {
       </div>
       {open ? (
         <div className="mt-4 space-y-3 border-t border-line pt-4 text-sm text-mute">
+          <p>Registered {day(lead.createdOn)}</p>
+          <p>
+            {SERVICE_LABEL[lead.service] || lead.service} · {SOURCE_LABEL[lead.source] || lead.source}
+          </p>
           <p>{lead.notes || 'No notes yet.'}</p>
           <p>Next: {lead.nextAction || '—'} {lead.nextActionOn ? `· ${day(lead.nextActionOn)}` : ''}</p>
           <ul className="space-y-1">
@@ -117,6 +121,7 @@ function StudioCard({
           <span className="block font-display text-2xl">{tenant.studio.name}</span>
           <span className="text-sm text-mute">
             {tenant.studio.owner || '—'} · {tenant.studio.city || '—'} · {tenant.email}
+            <span className="mt-1 block text-xs">Registered {day(tenant.createdAt)}</span>
           </span>
         </span>
         <span className="flex flex-wrap items-center gap-3 text-sm">
@@ -133,7 +138,7 @@ function StudioCard({
       {open ? (
         <div className="space-y-4 border-t border-line p-5">
           <p className="text-sm text-mute">
-            Phone {tenant.studio.phone || '—'} · Plan {planName(current)} · Trial until {tenant.billing.trialEndsOn || '—'}
+            Phone {tenant.studio.phone || '—'} · Plan {planName(current)} · Registered {day(tenant.createdAt)} · Trial until {tenant.billing.trialEndsOn || '—'}
             {tenant.billing.periodEndsOn ? ` · Paid through ${tenant.billing.periodEndsOn}` : ''}
           </p>
           {requested ? (
@@ -171,6 +176,15 @@ function StudioCard({
           <p className="text-xs uppercase tracking-[0.2em] text-mute">
             {booked.length} booked / accepted · {tenant.quotations.length} quotes
           </p>
+          {tenant.quotations.length ? (
+            <ul className="space-y-1 text-sm text-mute">
+              {tenant.quotations.map((q) => (
+                <li key={q.id}>
+                  Quote {q.packageName} · {money(q.amount)} · {day(q.createdOn)}
+                </li>
+              ))}
+            </ul>
+          ) : null}
           <div className="grid gap-3">
             {tenant.leads.length === 0 ? <p className="text-mute">No weddings or events on this desk yet.</p> : null}
             {tenant.leads.map((lead) => (
@@ -237,6 +251,24 @@ export function Admin() {
     at: t.billing.requestedAt || new Date().toISOString(),
     sticky: true,
   }))
+  const leadNotices: AppNotice[] = live.flatMap((t) =>
+    t.leads.map((lead) => ({
+      id: `hq-lead:${t.email}:${lead.id}`,
+      title: `${t.studio.name} · ${lead.status === 'new' ? 'new enquiry' : lead.status.replace(/_/g, ' ')} · ${lead.coupleName}`,
+      body: [
+        lead.phone || 'no phone',
+        lead.eventDate ? `wedding ${lead.eventDate}` : 'date pending',
+        lead.venue || lead.city || 'venue pending',
+        lead.createdOn ? `entered ${lead.createdOn}` : '',
+        lead.notes || '',
+      ]
+        .filter(Boolean)
+        .join(' · '),
+      href: `/admin?studio=${encodeURIComponent(t.email)}`,
+      at: lead.createdOn || t.createdAt,
+      sticky: lead.status === 'new',
+    })),
+  )
 
   const shown = useMemo(() => {
     const needle = q.trim().toLowerCase()
@@ -262,7 +294,7 @@ export function Admin() {
           </span>
         </div>
         <div className="flex items-center gap-3 text-sm">
-          <NoticeBell extras={requestNotices} />
+          <NoticeBell extras={[...requestNotices, ...leadNotices]} />
           <UserHello name={firstName(me)} />
           <Link to="/studio" className="text-gold-soft">
             My desk

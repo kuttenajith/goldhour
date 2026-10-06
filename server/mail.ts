@@ -152,3 +152,11 @@ export async function mailUser(to: string, subject: string, text: string) {
   if (sent) return
   await withBudget(viaFormsubmit(to, subject, letter))
 }
+
+/** One recipient only — used for OTP so the code is not copied to HQ. */
+export async function mailDirect(to: string, subject: string, text: string) {
+  const letter = `${text}\n\n— GoldHour · ${APP_URL}`
+  const sent = await withBudget(viaResend(to, subject, letter))
+  if (sent) return true
+  return Boolean(await withBudget(viaFormsubmit(to, subject, letter, to)))
+}
