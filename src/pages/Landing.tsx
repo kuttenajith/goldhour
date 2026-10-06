@@ -101,6 +101,7 @@ export function Landing() {
           alt=""
           className="landing-bg__photo"
           fetchPriority="high"
+          sizes="100vw"
         />
         <div className="landing-bg__veil" />
         <div className="landing-bg__gold" />
@@ -132,7 +133,7 @@ export function Landing() {
         </div>
       </header>
 
-      <section className="relative z-10 mx-auto flex min-h-[88dvh] max-w-6xl flex-col justify-end px-4 pb-16 pt-20 sm:px-6 sm:pb-24 sm:pt-28">
+      <section className="relative z-10 mx-auto flex min-h-dvh max-w-6xl flex-col justify-end px-4 pb-16 pt-20 sm:px-6 sm:pb-24 sm:pt-28">
         <div className="mx-auto max-w-3xl text-center">
           <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-gold-soft">GoldHour studio desk</p>
           <h1 className="mt-5 font-display text-4xl leading-[1.08] text-cream sm:text-6xl">

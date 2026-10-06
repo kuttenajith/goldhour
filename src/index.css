@@ -176,20 +176,30 @@ html[data-theme='daylight'] body {
 
 .landing-bg {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
   z-index: 0;
+  width: 100vw;
+  height: 100dvh;
+  min-width: 100%;
+  min-height: 100vh;
   pointer-events: none;
   overflow: hidden;
 }
 
 .landing-bg__photo {
   position: absolute;
-  inset: -8%;
-  width: 116%;
-  height: 116%;
+  top: 50%;
+  left: 50%;
+  width: 100vw;
+  height: 100dvh;
+  min-width: 100%;
+  min-height: 100%;
+  max-width: none;
   object-fit: cover;
-  object-position: center 28%;
+  object-position: center 32%;
   filter: saturate(1.08) contrast(1.08);
+  transform: translate(-50%, -50%) scale(1.12);
   animation: landingKenburns 32s ease-in-out infinite alternate;
 }
 
@@ -197,8 +207,8 @@ html[data-theme='daylight'] body {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(ellipse at 50% 28%, rgba(12, 10, 9, 0.18) 0%, rgba(12, 10, 9, 0.55) 52%, rgba(12, 10, 9, 0.92) 100%),
-    linear-gradient(180deg, rgba(12, 10, 9, 0.28) 0%, rgba(12, 10, 9, 0.55) 48%, var(--color-ink) 100%);
+    radial-gradient(ellipse at 50% 40%, rgba(12, 10, 9, 0.12) 0%, rgba(12, 10, 9, 0.28) 58%, rgba(12, 10, 9, 0.55) 100%),
+    linear-gradient(180deg, rgba(12, 10, 9, 0.2) 0%, rgba(12, 10, 9, 0.35) 42%, var(--color-ink) 100%);
 }
 
 .landing-bg__gold {
@@ -210,10 +220,10 @@ html[data-theme='daylight'] body {
 
 @keyframes landingKenburns {
   from {
-    transform: scale(1) translate3d(0, 0, 0);
+    transform: translate(-50%, -50%) scale(1.12);
   }
   to {
-    transform: scale(1.12) translate3d(-2.4%, -1.6%, 0);
+    transform: translate(-54%, -52%) scale(1.22);
   }
 }
 
