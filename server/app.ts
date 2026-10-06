@@ -290,7 +290,7 @@ app.onError((err, c) => {
   return c.json({ error: 'Something went wrong. Try again.', errorId: id }, 500)
 })
 
-app.post('/auth/otp/send', async (c) => {
+app.post('/auth/otp-send', async (c) => {
   const ip = clientIp(c)
   if (await lockedOut('otp', ip)) {
     return c.json({ error: 'Too many OTP attempts. Wait 15 minutes.' }, 429)
@@ -328,7 +328,7 @@ app.post('/auth/otp/send', async (c) => {
   return c.json({ ok: true, sms })
 })
 
-app.post('/auth/otp/verify', async (c) => {
+app.post('/auth/otp-verify', async (c) => {
   const body = await readJson<{ phone?: string; code?: string }>(c)
   const mobile = indiaMobile(body.phone || '')
   const code = (body.code || '').replace(/\D/g, '').slice(0, 6)

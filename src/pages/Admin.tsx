@@ -7,7 +7,7 @@ import { DeskSession } from '../components/TabGuard.tsx'
 import { SiteVisits } from '../components/SiteVisits.tsx'
 import { StatusPill } from '../components/StatusPill.tsx'
 import { fieldClass } from '../components/Field.tsx'
-import { day, money, paid, PAYMENT_LABEL, SERVICE_LABEL, SOURCE_LABEL } from '../lib/format.ts'
+import { day, money, paid, when, PAYMENT_LABEL, SERVICE_LABEL, SOURCE_LABEL } from '../lib/format.ts'
 import { firstName } from '../lib/copilot.ts'
 import { api, logoutStudio, useStudio } from '../lib/store.ts'
 import { UserHello } from '../components/UserHello.tsx'
@@ -39,7 +39,7 @@ function LeadBlock({ lead }: { lead: Lead }) {
         <span>
           <span className="block font-medium">{lead.coupleName}</span>
           <span className="text-xs text-mute">
-            Entered {day(lead.createdOn)} · Wedding {day(lead.eventDate)} · {lead.venue || lead.city || 'Venue pending'} · {lead.phone || 'no phone'}
+            Entered {when(lead.createdOn)} · Wedding {day(lead.eventDate)} · {lead.venue || lead.city || 'Venue pending'} · {lead.phone || 'no phone'}
           </span>
         </span>
         <StatusPill status={lead.status} />
@@ -50,7 +50,7 @@ function LeadBlock({ lead }: { lead: Lead }) {
       </div>
       {open ? (
         <div className="mt-4 space-y-3 border-t border-line pt-4 text-sm text-mute">
-          <p>Registered {day(lead.createdOn)}</p>
+          <p>Entered {when(lead.createdOn)}</p>
           <p>
             {SERVICE_LABEL[lead.service] || lead.service} · {SOURCE_LABEL[lead.source] || lead.source}
           </p>
@@ -121,7 +121,7 @@ function StudioCard({
           <span className="block font-display text-2xl">{tenant.studio.name}</span>
           <span className="text-sm text-mute">
             {tenant.studio.owner || '—'} · {tenant.studio.city || '—'} · {tenant.email}
-            <span className="mt-1 block text-xs">Registered {day(tenant.createdAt)}</span>
+            <span className="mt-1 block text-xs">Joined {when(tenant.createdAt)}</span>
           </span>
         </span>
         <span className="flex flex-wrap items-center gap-3 text-sm">
@@ -137,10 +137,30 @@ function StudioCard({
       </button>
       {open ? (
         <div className="space-y-4 border-t border-line p-5">
-          <p className="text-sm text-mute">
-            Phone {tenant.studio.phone || '—'} · Plan {planName(current)} · Registered {day(tenant.createdAt)} · Trial until {tenant.billing.trialEndsOn || '—'}
-            {tenant.billing.periodEndsOn ? ` · Paid through ${tenant.billing.periodEndsOn}` : ''}
-          </p>
+          <dl className="grid gap-x-6 gap-y-2 text-sm text-mute sm:grid-cols-2">
+            <div>
+              <dt className="text-[11px] uppercase tracking-[0.16em]">Phone</dt>
+              <dd className="text-cream">{tenant.studio.phone || '—'}</dd>
+            </div>
+            <div>
+              <dt className="text-[11px] uppercase tracking-[0.16em]">Plan</dt>
+              <dd className="text-cream">{planName(current)}</dd>
+            </div>
+            <div>
+              <dt className="text-[11px] uppercase tracking-[0.16em]">Joined</dt>
+              <dd className="text-cream">{when(tenant.createdAt)}</dd>
+            </div>
+            <div>
+              <dt className="text-[11px] uppercase tracking-[0.16em]">Trial until</dt>
+              <dd className="text-cream">{day(tenant.billing.trialEndsOn) || '—'}</dd>
+            </div>
+            {tenant.billing.periodEndsOn ? (
+              <div>
+                <dt className="text-[11px] uppercase tracking-[0.16em]">Paid through</dt>
+                <dd className="text-cream">{day(tenant.billing.periodEndsOn)}</dd>
+              </div>
+            ) : null}
+          </dl>
           {requested ? (
             <p className="rounded-xl border border-gold/40 bg-gold/10 px-4 py-3 text-sm text-gold-soft">
               {tenant.email} asked to switch to {planName(requested)}. Approve below.

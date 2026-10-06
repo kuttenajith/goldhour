@@ -26,10 +26,14 @@ export function Signup() {
   const [password, setPassword] = useState('')
   const [otp, setOtp] = useState('')
   const [phoneVerified, setPhoneVerified] = useState(false)
+  const [otpSent, setOtpSent] = useState(false)
   const [otpHint, setOtpHint] = useState('')
   const [errors, setErrors] = useState({ studioName: '', owner: '', city: '', phone: '', email: '', password: '', otp: '' })
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [sending, setSending] = useState(false)
+  const [verifying, setVerifying] = useState(false)
+  const pending = busy || sending || verifying
 
   function validate() {
     const next = {
@@ -51,16 +55,18 @@ export function Signup() {
     setErrors((p) => ({ ...p, phone: phoneMsg, email: mailMsg, otp: '' }))
     setError('')
     if (phoneMsg || mailMsg) return
-    setBusy(true)
+    setSending(true)
     try {
-      await api('/api/auth/otp/send', { method: 'POST', body: JSON.stringify({ phone, email }) })
+      await api('/api/auth/otp-send', { method: 'POST', body: JSON.stringify({ phone, email }) })
       setPhoneVerified(false)
       setOtp('')
+      setOtpSent(true)
       setOtpHint('Code sent to your mobile, and copied to email if SMS is delayed.')
     } catch (err) {
+      setOtpSent(false)
       setError(err instanceof Error ? err.message : 'Could not send the code')
     } finally {
-      setBusy(false)
+      setSending(false)
     }
   }
 
@@ -70,10 +76,10 @@ export function Signup() {
       setErrors((p) => ({ ...p, otp: 'Enter the 6-digit code' }))
       return
     }
-    setBusy(true)
+    setVerifying(true)
     setError('')
     try {
-      await api('/api/auth/otp/verify', { method: 'POST', body: JSON.stringify({ phone, code }) })
+      await api('/api/auth/otp-verify', { method: 'POST', body: JSON.stringify({ phone, code }) })
       setPhoneVerified(true)
       setErrors((p) => ({ ...p, otp: '' }))
       setOtpHint('Mobile confirmed.')
@@ -81,7 +87,7 @@ export function Signup() {
       setPhoneVerified(false)
       setErrors((p) => ({ ...p, otp: err instanceof Error ? err.message : 'That code is not right' }))
     } finally {
-      setBusy(false)
+      setVerifying(false)
     }
   }
 
@@ -165,6 +171,7 @@ export function Signup() {
                 const v = e.target.value.trim()
                 setEmail(v)
                 setPhoneVerified(false)
+                setOtpSent(false)
                 setErrors((p) => ({ ...p, email: v.includes('@') ? emailError(v) : '' }))
               }}
               required
@@ -184,11 +191,12 @@ export function Signup() {
                   setPhoneVerified(false)
                   setOtp('')
                   setOtpHint('')
+                  setOtpSent(false)
                   setErrors((p) => ({ ...p, phone: v ? phoneError(v) : '', otp: '' }))
                 }}
               />
-              <Button type="button" tone="ghost" className="shrink-0" disabled={busy} onClick={() => void sendCode()}>
-                {busy ? 'Sending…' : 'Send OTP'}
+              <Button type="button" tone="ghost" className="shrink-0 min-w-28" disabled={pending} onClick={() => void sendCode()}>
+                {sending ? 'Sending…' : otpSent ? 'Resend OTP' : 'Send OTP'}
               </Button>
             </div>
           </Field>
@@ -207,8 +215,8 @@ export function Signup() {
                   setErrors((p) => ({ ...p, otp: '' }))
                 }}
               />
-              <Button type="button" tone="ghost" className="shrink-0" disabled={busy || otp.length !== 6} onClick={() => void confirmCode()}>
-                {phoneVerified ? 'Confirmed' : 'Confirm OTP'}
+              <Button type="button" tone="ghost" className="shrink-0 min-w-28" disabled={pending || otp.length !== 6 || phoneVerified} onClick={() => void confirmCode()}>
+                {verifying ? 'Confirming…' : phoneVerified ? 'Confirmed' : 'Confirm OTP'}
               </Button>
             </div>
           </Field>
@@ -228,7 +236,7 @@ export function Signup() {
             />
           </Field>
           {error ? <p className="text-sm text-orange-200">{error}</p> : null}
-          <Button type="submit" className="w-full" disabled={busy || !phoneVerified}>
+          <Button type="submit" className="w-full" disabled={pending || !phoneVerified}>
             {busy ? 'Creating…' : phoneVerified ? 'Create studio · 14-day trial' : 'Confirm mobile to continue'}
           </Button>
         </form>

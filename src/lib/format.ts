@@ -23,11 +23,22 @@ export function money(n: number) {
   return rupee.format(n)
 }
 
+function parseWhen(iso: string) {
+  if (!iso) return null
+  const d = /T/.test(iso) ? new Date(iso) : new Date(`${iso}T00:00:00`)
+  return Number.isNaN(d.getTime()) ? null : d
+}
+
 export function day(iso: string) {
-  if (!iso) return '—'
-  const d = new Date(`${iso}T00:00:00`)
-  if (Number.isNaN(d.getTime())) return iso
-  return dayFmt.format(d)
+  const d = parseWhen(iso)
+  return d ? dayFmt.format(d) : iso || '—'
+}
+
+export function when(iso: string) {
+  const d = parseWhen(iso)
+  if (!d) return iso || '—'
+  if (!/T/.test(iso)) return dayFmt.format(d)
+  return `${dayFmt.format(d)}, ${timeFmt.format(d)}`
 }
 
 export function clock(hhmm: string) {
