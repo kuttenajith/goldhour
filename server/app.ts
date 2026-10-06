@@ -42,7 +42,7 @@ import {
   notifyStudioSignup,
   notifyTrialWelcome,
 } from './notify.ts'
-import { indiaMobile, otpHash, sendPhoneOtp, TF_PREFIX, verify2Factor } from './otp.ts'
+import { indiaMobile, otpHash, sendPhoneOtp } from './otp.ts'
 import { pendingPlanRequest } from './planRequests.ts'
 import { PLANS, addDays, billingStatus, todayIso, trialEnd, type PaidPlanId } from './plans.ts'
 import { emailOk, passwordOk, studioPayloadTooLarge, validateLeads, validateQuotations, validateStudioProfile } from './validate.ts'
@@ -309,10 +309,9 @@ app.post('/auth/otp-send', async (c) => {
     return c.json({ error: 'Could not send SMS to this number. Check the number and tap Send OTP again.' }, 502)
   }
   const now = new Date()
-  const codeHash = 'sessionId' in sent ? `${TF_PREFIX}${sent.sessionId}` : otpHash(mobile, sent.code)
   await db.putPhoneOtp({
     phone: mobile,
-    codeHash,
+    codeHash: otpHash(mobile, sent.code),
     expiresAt: new Date(now.getTime() + 10 * 60 * 1000).toISOString(),
     verifiedAt: null,
     sentAt: now.toISOString(),
@@ -333,15 +332,12 @@ app.post('/auth/otp-verify', async (c) => {
   if (new Date(row.expiresAt).getTime() < Date.now()) {
     return c.json({ error: 'That code expired. Send a new one.' }, 400)
   }
-  const match = row.codeHash.startsWith(TF_PREFIX)
-    ? await verify2Factor(
-        (process.env.TWOFACTOR_API_KEY || '').trim() || (await db.getSetting('twofactor_api_key')) || '',
-        row.codeHash.slice(TF_PREFIX.length),
-        code,
-      )
-    : row.codeHash === otpHash(mobile, code)
+  const match = row.codeHash === otpHash(mobile, code)
   await db.putPhoneOtp({
-    ...row,
+    phone: row.phone,
+    codeHash: row.codeHash,
+    expiresAt: row.expiresAt,
+    sentAt: row.sentAt,
     tries: row.tries + 1,
     verifiedAt: match ? new Date().toISOString() : row.verifiedAt,
   })

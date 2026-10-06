@@ -747,11 +747,17 @@ function postgresStore(url: string): Store {
       const rows = await sql`SELECT phone, code_hash AS "codeHash", expires_at AS "expiresAt", verified_at AS "verifiedAt", sent_at AS "sentAt", tries FROM phone_otps WHERE phone = ${phone}`
       const row = rows[0] as PhoneOtpRow | undefined
       if (!row) return null
+      const asIso = (value: unknown, empty: string | null) => {
+        const d = value instanceof Date ? value : new Date(String(value || ''))
+        if (Number.isNaN(d.getTime())) return empty
+        return d.toISOString()
+      }
       return {
-        ...row,
-        expiresAt: String(row.expiresAt),
-        verifiedAt: row.verifiedAt ? String(row.verifiedAt) : null,
-        sentAt: String(row.sentAt),
+        phone: String(row.phone),
+        codeHash: String(row.codeHash || (row as { code_hash?: string }).code_hash || ''),
+        expiresAt: asIso(row.expiresAt, new Date().toISOString()) as string,
+        verifiedAt: asIso(row.verifiedAt, null),
+        sentAt: asIso(row.sentAt, new Date().toISOString()) as string,
         tries: Number(row.tries || 0),
       }
     },

@@ -17,12 +17,10 @@ export function otpHash(phone: string, code: string) {
   return hashToken(`${phone}:${code}`)
 }
 
-export const TF_PREFIX = 'tf:'
-
-async function postJson(url: string, init: RequestInit) {
+async function postJson(url: string, init: RequestInit = { method: 'GET' }) {
   const res = await fetch(url, init)
   const body = await res.text().catch(() => '')
-  if (!res.ok) console.error('goldhour-otp-http', res.status, url.slice(0, 80), body.slice(0, 180))
+  if (!res.ok) console.error('goldhour-otp-http', res.status, body.slice(0, 180))
   return { ok: res.ok, body }
 }
 
@@ -34,27 +32,25 @@ function parseJson(body: string) {
   }
 }
 
-/** 2Factor AUTOGEN — they create and SMS the code. Returns session id. */
-async function via2FactorAutogen(key: string, phone: string) {
-  const { ok, body } = await postJson(
-    `https://2factor.in/API/V1/${encodeURIComponent(key)}/SMS/91${phone}/AUTOGEN`,
-    { method: 'GET' },
-  )
+function twoFactorOk(body: string, httpOk: boolean) {
   const json = parseJson(body)
   const status = String(json?.Status || '')
-  const details = String(json?.Details || '')
-  if (ok && status.toLowerCase() === 'success' && details) return details
-  console.error('goldhour-otp-2factor', status, details.slice(0, 160) || body.slice(0, 160))
-  return ''
+  if (httpOk && status.toLowerCase() === 'success') return true
+  console.error('goldhour-otp-2factor', status, String(json?.Details || body).slice(0, 160))
+  return false
 }
 
-export async function verify2Factor(key: string, sessionId: string, code: string) {
-  const { ok, body } = await postJson(
-    `https://2factor.in/API/V1/${encodeURIComponent(key)}/SMS/VERIFY/${encodeURIComponent(sessionId)}/${encodeURIComponent(code)}`,
-    { method: 'GET' },
-  )
-  const json = parseJson(body)
-  return ok && String(json?.Status || '').toLowerCase() === 'success'
+/** SMS only — never AUTOGEN/VOICE, which 2Factor falls back to a phone call. */
+async function via2FactorSms(key: string, phone: string, code: string) {
+  const paths = [
+    `https://2factor.in/API/V1/${encodeURIComponent(key)}/SMS/91${phone}/${encodeURIComponent(code)}/OTP1`,
+    `https://2factor.in/API/V1/${encodeURIComponent(key)}/SMS/91${phone}/${encodeURIComponent(code)}`,
+  ]
+  for (const url of paths) {
+    const { ok, body } = await postJson(url)
+    if (twoFactorOk(body, ok)) return true
+  }
+  return false
 }
 
 async function viaFast2Sms(key: string, phone: string, message: string) {
@@ -66,22 +62,23 @@ async function viaFast2Sms(key: string, phone: string, message: string) {
   return ok && !body.toLowerCase().includes('"return":false')
 }
 
-export type OtpSendResult =
-  | { ok: true; sessionId: string }
-  | { ok: true; code: string }
-  | { ok: false; reason: string }
+export type OtpSendResult = { ok: true; code: string } | { ok: false; reason: string }
 
 export async function sendPhoneOtp(opts: { phone: string; twoFactorKey: string; fast2smsKey: string }): Promise<OtpSendResult> {
   const mobile = indiaMobile(opts.phone)
   if (!mobile) return { ok: false, reason: 'bad-phone' }
+  const code = newOtpCode()
   if (opts.twoFactorKey) {
-    const sessionId = await via2FactorAutogen(opts.twoFactorKey, mobile)
-    if (sessionId) return { ok: true, sessionId }
+    const sms = await via2FactorSms(opts.twoFactorKey, mobile, code)
+    if (sms) return { ok: true, code }
     return { ok: false, reason: '2factor' }
   }
   if (opts.fast2smsKey) {
-    const code = newOtpCode()
-    const sent = await viaFast2Sms(opts.fast2smsKey, mobile, `GoldHour code ${code}. Valid 10 minutes. Do not share.`)
+    const sent = await viaFast2Sms(
+      opts.fast2smsKey,
+      mobile,
+      `GoldHour code ${code}. Valid 10 minutes. Do not share.`,
+    )
     if (sent) return { ok: true, code }
     return { ok: false, reason: 'fast2sms' }
   }
