@@ -29,6 +29,7 @@ import {
 import { emptyStudio, getStore, type AuditRow, type UserRow } from './db.ts'
 import { mailUser } from './mail.ts'
 import { hqNotices, studioNotices } from './notices.ts'
+import { mailNewHqNotices } from './noticeMail.ts'
 import {
   notifyCheckout,
   notifyDemoOpened,
@@ -836,6 +837,11 @@ app.get('/notices', async (c) => {
     try {
       const [tenants, audit] = await Promise.all([db.listTenants(), billingAwareAudit()])
       const notices = hqNotices({ tenants, audit })
+      try {
+        await mailNewHqNotices(notices)
+      } catch (err) {
+        console.error('goldhour-notices-mail', err)
+      }
       return c.json({ notices })
     } catch (err) {
       console.error('goldhour-notices', err)

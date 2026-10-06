@@ -94,8 +94,20 @@ const verticals = [
 
 export function Landing() {
   return (
-    <div className="overflow-x-clip bg-ink text-cream">
-      <header className="sticky top-0 z-30 border-b border-line bg-ink/80 backdrop-blur">
+    <div className="relative text-cream">
+      <div className="landing-bg" aria-hidden>
+        <img
+          src={asset('photos/hero-couple.png')}
+          alt=""
+          className="landing-bg__photo"
+          fetchPriority="high"
+        />
+        <div className="landing-bg__veil" />
+        <div className="landing-bg__gold" />
+        <div className="grain absolute inset-0 opacity-80" />
+      </div>
+
+      <header className="sticky top-0 z-30 border-b border-line/80 bg-ink/35 backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <BrandMark />
           <nav className="hidden items-center gap-8 text-sm text-mute lg:flex">
@@ -120,7 +132,7 @@ export function Landing() {
         </div>
       </header>
 
-      <section className="mx-auto max-w-6xl px-4 pb-10 pt-16 sm:px-6 sm:pt-24">
+      <section className="relative z-10 mx-auto flex min-h-[88dvh] max-w-6xl flex-col justify-end px-4 pb-16 pt-20 sm:px-6 sm:pb-24 sm:pt-28">
         <div className="mx-auto max-w-3xl text-center">
           <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-gold-soft">GoldHour studio desk</p>
           <h1 className="mt-5 font-display text-4xl leading-[1.08] text-cream sm:text-6xl">
@@ -142,25 +154,20 @@ export function Landing() {
               </Button>
             </Link>
           </div>
-        </div>
-        <figure className="relative mt-12 overflow-hidden rounded-[2rem] border border-line">
-          <img
-            src={asset('photos/hero-couple.png')}
-            alt="Indian bride and groom at golden hour"
-            className="aspect-[16/10] w-full object-cover sm:aspect-[21/9]"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/20 to-transparent" />
-          <figcaption className="absolute bottom-4 left-4 right-4 flex flex-wrap gap-2 sm:bottom-6 sm:left-6">
+          <div className="mt-10 flex flex-wrap items-center justify-center gap-2">
             {['Enquiry', 'Quotations', 'Pulse', 'Chatbot'].map((chip) => (
-              <span key={chip} className="rounded-full border border-gold/35 bg-ink/70 px-3 py-1 text-xs uppercase tracking-wider text-gold-soft backdrop-blur">
+              <span
+                key={chip}
+                className="rounded-full border border-gold/35 bg-ink/45 px-3 py-1 text-xs uppercase tracking-wider text-gold-soft backdrop-blur"
+              >
                 {chip}
               </span>
             ))}
-          </figcaption>
-        </figure>
+          </div>
+        </div>
       </section>
 
-      <section id="product" className="border-t border-line py-20 sm:py-24">
+      <section id="product" className="relative z-10 border-t border-line/80 bg-ink/72 py-20 backdrop-blur-md sm:py-24">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <div className="grid items-center gap-10 lg:grid-cols-[1.05fr_0.95fr]">
             <div>
@@ -212,7 +219,7 @@ export function Landing() {
         </div>
       </section>
 
-      <section className="border-t border-line bg-ink-2 py-20 sm:py-24">
+      <section className="relative z-10 border-t border-line/80 bg-ink-2/80 py-20 backdrop-blur-md sm:py-24">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-gold">All on one desk</p>
           <h2 className="mt-4 max-w-2xl font-display text-4xl sm:text-5xl">Everything you need. In the order a wedding actually runs.</h2>
@@ -233,7 +240,7 @@ export function Landing() {
         </div>
       </section>
 
-      <section className="border-t border-line py-16 sm:py-20">
+      <section className="relative z-10 border-t border-line/80 bg-ink/55 py-16 backdrop-blur-sm sm:py-20">
         <div className="mx-auto grid max-w-6xl gap-8 px-4 sm:grid-cols-4 sm:px-6">
           {[
             ['14 days', 'Free trial on your own account'],
@@ -249,7 +256,7 @@ export function Landing() {
         </div>
       </section>
 
-      <section id="desk" className="border-t border-line py-20 sm:py-24">
+      <section id="desk" className="relative z-10 border-t border-line/80 bg-ink/70 py-20 backdrop-blur-md sm:py-24">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-gold">Made for the season</p>
           <h2 className="mt-4 max-w-2xl font-display text-4xl sm:text-5xl">Mehendi to reception. One couple at a time.</h2>
@@ -266,7 +273,7 @@ export function Landing() {
         </div>
       </section>
 
-      <section id="pricing" className="border-t border-line bg-ink-2 py-20 sm:py-24">
+      <section id="pricing" className="relative z-10 border-t border-line/80 bg-ink-2/80 py-20 backdrop-blur-md sm:py-24">
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-gold">Pricing</p>
           <h2 className="mt-4 font-display text-4xl sm:text-5xl">Fourteen days free. Then the studio pays.</h2>
@@ -299,7 +306,7 @@ export function Landing() {
         </div>
       </section>
 
-      <section id="start" className="px-4 py-20 sm:px-6 sm:py-24">
+      <section id="start" className="relative z-10 bg-ink/70 px-4 py-20 backdrop-blur-md sm:px-6 sm:py-24">
         <div className="mx-auto max-w-6xl overflow-hidden rounded-[2rem] border border-line">
           <div className="grid lg:grid-cols-2">
             <div className="flex flex-col justify-center bg-ink-2 p-8 sm:p-12">
@@ -323,7 +330,9 @@ export function Landing() {
         </div>
       </section>
 
-      <SiteFooter />
+      <div className="relative z-10 bg-ink/90 backdrop-blur-md">
+        <SiteFooter />
+      </div>
     </div>
   )
 }

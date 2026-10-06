@@ -64,6 +64,10 @@ function hqHref(email?: string) {
   return `/admin?studio=${encodeURIComponent(email)}`
 }
 
+export function hqPlanRequestId(email: string, plan: string) {
+  return `hq-request:${email}:${plan}`
+}
+
 function liveStudio(leads: Lead[], billing: { status: string; trialEndsOn: string }, pro: boolean): AppNotice[] {
   const today = todayIso()
   const items: AppNotice[] = []
@@ -233,7 +237,7 @@ export function hqNotices(opts: { tenants: TenantPublic[]; audit: AuditRow[] }):
       })
       if (pending) {
         live.push({
-          id: `hq-request:${email}:${pending.plan}`,
+          id: hqPlanRequestId(email, pending.plan),
           title: `${name} asked for ${planTitle(pending.plan)}`,
           body: `${email} · open HQ and switch the desk`,
           href: hqHref(email),

@@ -173,3 +173,62 @@ html[data-theme='daylight'] body {
   background: var(--color-ink);
   color: var(--color-cream);
 }
+
+.landing-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.landing-bg__photo {
+  position: absolute;
+  inset: -8%;
+  width: 116%;
+  height: 116%;
+  object-fit: cover;
+  object-position: center 28%;
+  filter: saturate(1.08) contrast(1.08);
+  animation: landingKenburns 32s ease-in-out infinite alternate;
+}
+
+.landing-bg__veil {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 50% 28%, rgba(12, 10, 9, 0.18) 0%, rgba(12, 10, 9, 0.55) 52%, rgba(12, 10, 9, 0.92) 100%),
+    linear-gradient(180deg, rgba(12, 10, 9, 0.28) 0%, rgba(12, 10, 9, 0.55) 48%, var(--color-ink) 100%);
+}
+
+.landing-bg__gold {
+  position: absolute;
+  inset: auto -20% -18% -20%;
+  height: 42%;
+  background: radial-gradient(ellipse at 50% 100%, rgba(201, 162, 39, 0.22), transparent 64%);
+}
+
+@keyframes landingKenburns {
+  from {
+    transform: scale(1) translate3d(0, 0, 0);
+  }
+  to {
+    transform: scale(1.12) translate3d(-2.4%, -1.6%, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-bg__photo {
+    animation: none;
+  }
+}
+
+html[data-theme='daylight'] .landing-bg__veil {
+  background:
+    radial-gradient(ellipse at 50% 28%, rgba(246, 239, 226, 0.2) 0%, rgba(246, 239, 226, 0.55) 55%, rgba(246, 239, 226, 0.92) 100%),
+    linear-gradient(180deg, rgba(246, 239, 226, 0.25) 0%, rgba(246, 239, 226, 0.72) 100%);
+}
+
+html[data-theme='daylight'] .landing-bg__gold {
+  background: radial-gradient(ellipse at 50% 100%, rgba(154, 115, 16, 0.18), transparent 64%);
+}

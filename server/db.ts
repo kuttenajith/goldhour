@@ -113,6 +113,8 @@ export type Store = {
   consumeToken(kind: TokenRow['kind'], tokenHash: string): Promise<TokenRow | null>
   insertAudit(row: AuditRow): Promise<void>
   listAudit(opts: { studioId?: string; limit?: number; actionPrefix?: string }): Promise<AuditRow[]>
+  claimUnmailed(ids: string[]): Promise<string[]>
+  releaseMailed(ids: string[]): Promise<void>
 }
 
 function mapUser(row: Partial<UserRow> & { id: string; email: string; passwordHash?: string; password_hash?: string; createdAt?: string; created_at?: string; emailVerifiedAt?: string | null; email_verified_at?: string | null; role?: string }): UserRow {
@@ -212,6 +214,7 @@ type FileShape = {
   attempts: { email: string; ip: string; ok: boolean; createdAt: string }[]
   tokens: TokenRow[]
   audit: AuditRow[]
+  mailed: string[]
 }
 
 function fileStore(path: string): Store {
@@ -224,6 +227,7 @@ function fileStore(path: string): Store {
     attempts: [],
     tokens: [],
     audit: [],
+    mailed: [],
   })
 
   function read(): FileShape {
@@ -401,6 +405,23 @@ function fileStore(path: string): Store {
         })
         .slice(0, limit)
     },
+    async claimUnmailed(ids) {
+      if (!ids.length) return []
+      const db = read()
+      const seen = new Set(db.mailed || [])
+      const claimed = ids.filter((id) => id && !seen.has(id))
+      if (!claimed.length) return []
+      db.mailed = [...db.mailed, ...claimed].slice(-4000)
+      write(db)
+      return claimed
+    },
+    async releaseMailed(ids) {
+      if (!ids.length) return
+      const drop = new Set(ids)
+      const db = read()
+      db.mailed = (db.mailed || []).filter((id) => !drop.has(id))
+      write(db)
+    },
   }
   return store
 }
@@ -483,6 +504,10 @@ function postgresStore(url: string): Store {
         detail text NOT NULL DEFAULT '',
         ip text NOT NULL DEFAULT '',
         created_at timestamptz NOT NULL DEFAULT now()
+      )`
+      await sql`CREATE TABLE IF NOT EXISTS mailed_notices (
+        id text PRIMARY KEY,
+        sent_at timestamptz NOT NULL DEFAULT now()
       )`
     },
     async findUserByEmail(email) {
@@ -646,6 +671,21 @@ function postgresStore(url: string): Store {
           ? await sql`SELECT id, studio_id AS "studioId", user_id AS "userId", action, detail, ip, created_at AS "createdAt" FROM audit_events WHERE action LIKE ${prefix} ORDER BY created_at DESC LIMIT ${limit}`
           : await sql`SELECT id, studio_id AS "studioId", user_id AS "userId", action, detail, ip, created_at AS "createdAt" FROM audit_events ORDER BY created_at DESC LIMIT ${limit}`
       return (rows as AuditRow[]).map((r) => ({ ...r, createdAt: String(r.createdAt) }))
+    },
+    async claimUnmailed(ids) {
+      const claimed: string[] = []
+      for (const id of ids) {
+        if (!id) continue
+        const rows = await sql`INSERT INTO mailed_notices (id) VALUES (${id}) ON CONFLICT (id) DO NOTHING RETURNING id`
+        if (rows[0]) claimed.push(id)
+      }
+      return claimed
+    },
+    async releaseMailed(ids) {
+      for (const id of ids) {
+        if (!id) continue
+        await sql`DELETE FROM mailed_notices WHERE id = ${id}`
+      }
     },
   }
   return store
