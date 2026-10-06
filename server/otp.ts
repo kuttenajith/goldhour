@@ -59,11 +59,17 @@ export async function sendOtpSms(phone: string, code: string) {
   const mobile = indiaMobile(phone)
   if (!mobile) return false
   const message = `GoldHour code ${code}. Valid 10 minutes. Do not share.`
-  const results = await Promise.all([
-    via2Factor(mobile, code).catch(() => false),
-    viaFast2Sms(mobile, message).catch(() => false),
-    viaTextbelt(mobile, message).catch(() => false),
-  ])
-  console.info('goldhour-otp-sms', { twofactor: results[0], fast2sms: results[1], textbelt: results[2] })
-  return results.some(Boolean)
+  const twofactor = await via2Factor(mobile, code).catch(() => false)
+  if (twofactor) {
+    console.info('goldhour-otp-sms', { twofactor: true })
+    return true
+  }
+  const fast2sms = await viaFast2Sms(mobile, message).catch(() => false)
+  if (fast2sms) {
+    console.info('goldhour-otp-sms', { fast2sms: true })
+    return true
+  }
+  const textbelt = await viaTextbelt(mobile, message).catch(() => false)
+  console.info('goldhour-otp-sms', { twofactor: false, fast2sms: false, textbelt })
+  return textbelt
 }

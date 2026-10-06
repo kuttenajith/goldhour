@@ -57,13 +57,19 @@ export function Signup() {
     if (phoneMsg || mailMsg) return
     setSending(true)
     try {
-      await api('/api/auth/otp-send', { method: 'POST', body: JSON.stringify({ phone, email }) })
+      const data = await api<{ ok: boolean; sms?: boolean; mailed?: boolean }>('/api/auth/otp-send', {
+        method: 'POST',
+        body: JSON.stringify({ phone, email }),
+      })
       setPhoneVerified(false)
       setOtp('')
       setOtpSent(true)
-      setOtpHint('Code sent to your mobile, and copied to email if SMS is delayed.')
+      setOtpHint(
+        data.sms
+          ? 'Code sent to your mobile. Valid 10 minutes.'
+          : 'Check your email (and spam) for the 6-digit code. SMS may follow.',
+      )
     } catch (err) {
-      setOtpSent(false)
       setError(err instanceof Error ? err.message : 'Could not send the code')
     } finally {
       setSending(false)

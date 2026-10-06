@@ -79,7 +79,8 @@ async function viaFormsubmit(to: string, subject: string, message: string, reply
   })
   const lower = body.toLowerCase()
   if (lower.includes('confirm') || lower.includes('activate')) {
-    console.error('goldhour-mail-formsubmit-activate', body.slice(0, 240))
+    console.error('goldhour-mail-formsubmit-activate', to, body.slice(0, 240))
+    return false
   }
   if (!ok || lower.includes('"success":false') || lower.includes('"success": false')) {
     console.error('goldhour-mail-formsubmit', to, body.slice(0, 240))
@@ -156,7 +157,7 @@ export async function mailUser(to: string, subject: string, text: string) {
 /** One recipient only — used for OTP so the code is not copied to HQ. */
 export async function mailDirect(to: string, subject: string, text: string) {
   const letter = `${text}\n\n— GoldHour · ${APP_URL}`
-  const sent = await withBudget(viaResend(to, subject, letter))
-  if (sent) return true
+  if (await withBudget(viaSmtp(to, subject, letter))) return true
+  if (await withBudget(viaResend(to, subject, letter))) return true
   return Boolean(await withBudget(viaFormsubmit(to, subject, letter, to)))
 }

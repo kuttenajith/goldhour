@@ -291,10 +291,6 @@ app.onError((err, c) => {
 })
 
 app.post('/auth/otp-send', async (c) => {
-  const ip = clientIp(c)
-  if (await lockedOut('otp', ip)) {
-    return c.json({ error: 'Too many OTP attempts. Wait 15 minutes.' }, 429)
-  }
   const body = await readJson<{ phone?: string; email?: string }>(c)
   const mobile = indiaMobile(body.phone || '')
   const email = (body.email || '').trim().toLowerCase()
@@ -302,10 +298,22 @@ app.post('/auth/otp-send', async (c) => {
   if (!emailOk(email)) return c.json({ error: 'Enter the studio email first so we can also send the code there.' }, 400)
   const db = getStore()
   const existing = await db.getPhoneOtp(mobile)
-  if (existing && Date.now() - new Date(existing.sentAt).getTime() < 45_000) {
-    return c.json({ error: 'Wait a minute before requesting another code.' }, 429)
+  const gapMs = 8_000
+  const elapsed = existing ? Date.now() - new Date(existing.sentAt).getTime() : gapMs
+  if (existing && !existing.verifiedAt && elapsed < gapMs) {
+    const wait = Math.max(1, Math.ceil((gapMs - elapsed) / 1000))
+    return c.json({ error: `Wait ${wait} second${wait === 1 ? '' : 's'}, then tap Send OTP again.` }, 429)
   }
   const code = newOtpCode()
+  const sms = await sendOtpSms(mobile, code)
+  const mailed = await mailDirect(
+    email,
+    'GoldHour mobile code',
+    `Your GoldHour confirmation code is ${code}. It is valid for 10 minutes.\n\nIf you did not ask for this, ignore it.`,
+  )
+  if (!sms && !mailed) {
+    return c.json({ error: 'Could not send the code yet. Tap Send OTP again — we will retry SMS and email.' }, 502)
+  }
   const now = new Date()
   await db.putPhoneOtp({
     phone: mobile,
@@ -315,17 +323,7 @@ app.post('/auth/otp-send', async (c) => {
     sentAt: now.toISOString(),
     tries: 0,
   })
-  await db.recordAuthAttempt(email, ip, true)
-  const sms = await sendOtpSms(mobile, code)
-  const mailed = await mailDirect(
-    email,
-    'GoldHour mobile code',
-    `Your GoldHour confirmation code is ${code}. It is valid for 10 minutes.\n\nIf you did not ask for this, ignore it.`,
-  )
-  if (!sms && !mailed) {
-    return c.json({ error: 'Could not send the code. Check the number and email, then try again.' }, 502)
-  }
-  return c.json({ ok: true, sms })
+  return c.json({ ok: true, sms, mailed })
 })
 
 app.post('/auth/otp-verify', async (c) => {
