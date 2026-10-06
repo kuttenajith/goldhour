@@ -24,9 +24,16 @@ export function Signup() {
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [errors, setErrors] = useState({ studioName: '', owner: '', city: '', phone: '', email: '', password: '' })
+  const [otp, setOtp] = useState('')
+  const [phoneVerified, setPhoneVerified] = useState(false)
+  const [otpSent, setOtpSent] = useState(false)
+  const [otpHint, setOtpHint] = useState('')
+  const [errors, setErrors] = useState({ studioName: '', owner: '', city: '', phone: '', email: '', password: '', otp: '' })
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [sending, setSending] = useState(false)
+  const [verifying, setVerifying] = useState(false)
+  const pending = busy || sending || verifying
 
   function validate() {
     const next = {
@@ -36,9 +43,50 @@ export function Signup() {
       phone: phoneError(phone),
       email: emailError(email),
       password: passwordError(password),
+      otp: phoneVerified ? '' : 'Confirm the mobile number with the OTP',
     }
     setErrors(next)
     return !Object.values(next).some(Boolean)
+  }
+
+  async function sendCode() {
+    const phoneMsg = phoneError(phone)
+    setErrors((p) => ({ ...p, phone: phoneMsg, otp: '' }))
+    setError('')
+    if (phoneMsg) return
+    setSending(true)
+    try {
+      await api('/api/auth/otp-send', { method: 'POST', body: JSON.stringify({ phone }) })
+      setPhoneVerified(false)
+      setOtp('')
+      setOtpSent(true)
+      setOtpHint('Code sent to your mobile. Valid 10 minutes.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not send the code')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  async function confirmCode() {
+    const code = otp.replace(/\D/g, '').slice(0, 6)
+    if (code.length !== 6) {
+      setErrors((p) => ({ ...p, otp: 'Enter the 6-digit code' }))
+      return
+    }
+    setVerifying(true)
+    setError('')
+    try {
+      await api('/api/auth/otp-verify', { method: 'POST', body: JSON.stringify({ phone, code }) })
+      setPhoneVerified(true)
+      setErrors((p) => ({ ...p, otp: '' }))
+      setOtpHint('Mobile confirmed.')
+    } catch (err) {
+      setPhoneVerified(false)
+      setErrors((p) => ({ ...p, otp: err instanceof Error ? err.message : 'That code is not right' }))
+    } finally {
+      setVerifying(false)
+    }
   }
 
   async function submit(e: FormEvent) {
@@ -125,19 +173,54 @@ export function Signup() {
               required
             />
           </Field>
-          <Field label="WhatsApp / phone" error={errors.phone} hint="10-digit Indian mobile" required>
-            <input
-              required
-              className={fieldBox(errors.phone)}
-              value={phone}
-              inputMode="tel"
-              maxLength={13}
-              onChange={(e) => {
-                const v = onlyPhone(e.target.value)
-                setPhone(v)
-                setErrors((p) => ({ ...p, phone: v ? phoneError(v) : '' }))
-              }}
-            />
+          <Field label="WhatsApp / phone" error={errors.phone} hint="10-digit Indian mobile. We text a 6-digit OTP here." required>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <input
+                required
+                className={fieldBox(errors.phone)}
+                value={phone}
+                inputMode="tel"
+                maxLength={13}
+                onChange={(e) => {
+                  const v = onlyPhone(e.target.value)
+                  setPhone(v)
+                  setPhoneVerified(false)
+                  setOtp('')
+                  setOtpHint('')
+                  setOtpSent(false)
+                  setErrors((p) => ({ ...p, phone: v ? phoneError(v) : '', otp: '' }))
+                }}
+              />
+              <Button type="button" tone="ghost" className="min-w-28 shrink-0" disabled={pending} onClick={() => void sendCode()}>
+                {sending ? 'Sending…' : otpSent ? 'Resend OTP' : 'Send OTP'}
+              </Button>
+            </div>
+          </Field>
+          <Field label="Mobile OTP" error={errors.otp} hint={otpHint || 'Enter the 6-digit code, then confirm'} required>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <input
+                required
+                className={fieldBox(errors.otp)}
+                value={otp}
+                inputMode="numeric"
+                maxLength={6}
+                placeholder="000000"
+                onChange={(e) => {
+                  setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))
+                  setPhoneVerified(false)
+                  setErrors((p) => ({ ...p, otp: '' }))
+                }}
+              />
+              <Button
+                type="button"
+                tone="ghost"
+                className="min-w-28 shrink-0"
+                disabled={pending || otp.length !== 6 || phoneVerified}
+                onClick={() => void confirmCode()}
+              >
+                {verifying ? 'Confirming…' : phoneVerified ? 'Confirmed' : 'Confirm OTP'}
+              </Button>
+            </div>
           </Field>
           <Field label="Password (8+ characters)" error={errors.password} required>
             <input
@@ -155,8 +238,8 @@ export function Signup() {
             />
           </Field>
           {error ? <p className="text-sm text-orange-200">{error}</p> : null}
-          <Button type="submit" className="w-full" disabled={busy}>
-            {busy ? 'Creating…' : 'Create studio · 14-day trial'}
+          <Button type="submit" className="w-full" disabled={pending || !phoneVerified}>
+            {busy ? 'Creating…' : phoneVerified ? 'Create studio · 14-day trial' : 'Confirm mobile to continue'}
           </Button>
         </form>
         <p className="mt-6 text-sm text-mute">

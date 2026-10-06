@@ -42,6 +42,7 @@ import {
   notifyStudioSignup,
   notifyTrialWelcome,
 } from './notify.ts'
+import { indiaMobile, otpHash, sendPhoneOtp, TF_PREFIX, verify2Factor } from './otp.ts'
 import { pendingPlanRequest } from './planRequests.ts'
 import { PLANS, addDays, billingStatus, todayIso, trialEnd, type PaidPlanId } from './plans.ts'
 import { emailOk, passwordOk, studioPayloadTooLarge, validateLeads, validateQuotations, validateStudioProfile } from './validate.ts'
@@ -289,6 +290,65 @@ app.onError((err, c) => {
   return c.json({ error: 'Something went wrong. Try again.', errorId: id }, 500)
 })
 
+app.post('/auth/otp-send', async (c) => {
+  const body = await readJson<{ phone?: string }>(c)
+  const mobile = indiaMobile(body.phone || '')
+  if (!mobile) return c.json({ error: 'Enter a 10-digit Indian mobile number.' }, 400)
+  const db = getStore()
+  const existing = await db.getPhoneOtp(mobile)
+  const gapMs = 8_000
+  const elapsed = existing ? Date.now() - new Date(existing.sentAt).getTime() : gapMs
+  if (existing && !existing.verifiedAt && elapsed < gapMs) {
+    const wait = Math.max(1, Math.ceil((gapMs - elapsed) / 1000))
+    return c.json({ error: `Wait ${wait} second${wait === 1 ? '' : 's'}, then tap Send OTP again.` }, 429)
+  }
+  const twoFactorKey = (process.env.TWOFACTOR_API_KEY || '').trim() || (await db.getSetting('twofactor_api_key')) || ''
+  const fast2smsKey = (process.env.FAST2SMS_API_KEY || '').trim()
+  const sent = await sendPhoneOtp({ phone: mobile, twoFactorKey, fast2smsKey })
+  if (!sent.ok) {
+    return c.json({ error: 'Could not send SMS to this number. Check the number and tap Send OTP again.' }, 502)
+  }
+  const now = new Date()
+  const codeHash = 'sessionId' in sent ? `${TF_PREFIX}${sent.sessionId}` : otpHash(mobile, sent.code)
+  await db.putPhoneOtp({
+    phone: mobile,
+    codeHash,
+    expiresAt: new Date(now.getTime() + 10 * 60 * 1000).toISOString(),
+    verifiedAt: null,
+    sentAt: now.toISOString(),
+    tries: 0,
+  })
+  return c.json({ ok: true, sms: true })
+})
+
+app.post('/auth/otp-verify', async (c) => {
+  const body = await readJson<{ phone?: string; code?: string }>(c)
+  const mobile = indiaMobile(body.phone || '')
+  const code = (body.code || '').replace(/\D/g, '').slice(0, 6)
+  if (!mobile || code.length !== 6) return c.json({ error: 'Enter the 6-digit code.' }, 400)
+  const db = getStore()
+  const row = await db.getPhoneOtp(mobile)
+  if (!row) return c.json({ error: 'Send the code first.' }, 400)
+  if (row.tries >= 5) return c.json({ error: 'Too many tries. Send a new code.' }, 429)
+  if (new Date(row.expiresAt).getTime() < Date.now()) {
+    return c.json({ error: 'That code expired. Send a new one.' }, 400)
+  }
+  const match = row.codeHash.startsWith(TF_PREFIX)
+    ? await verify2Factor(
+        (process.env.TWOFACTOR_API_KEY || '').trim() || (await db.getSetting('twofactor_api_key')) || '',
+        row.codeHash.slice(TF_PREFIX.length),
+        code,
+      )
+    : row.codeHash === otpHash(mobile, code)
+  await db.putPhoneOtp({
+    ...row,
+    tries: row.tries + 1,
+    verifiedAt: match ? new Date().toISOString() : row.verifiedAt,
+  })
+  if (!match) return c.json({ error: 'That code is not right.' }, 400)
+  return c.json({ ok: true })
+})
+
 app.post('/auth/register', async (c) => {
   const ip = clientIp(c)
   if (await lockedOut('signup', ip)) {
@@ -316,6 +376,14 @@ app.post('/auth/register', async (c) => {
   }
   const db = getStore()
   const admin = isAdminEmail(email)
+  if (!admin) {
+    const mobile = indiaMobile(phone)
+    const otp = mobile ? await db.getPhoneOtp(mobile) : null
+    const verified = Boolean(otp?.verifiedAt && new Date(otp.verifiedAt).getTime() > Date.now() - 30 * 60 * 1000)
+    if (!verified) {
+      return c.json({ error: 'Confirm the mobile number with the OTP first.' }, 400)
+    }
+  }
   await db.recordAuthAttempt(email, ip, true)
   const user: UserRow = {
     id: newId(),
