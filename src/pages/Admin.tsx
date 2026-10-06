@@ -227,29 +227,11 @@ export function Admin() {
   const [q, setQ] = useState('')
   const [filter, setFilter] = useState<Filter>('live')
   const [autoOpenedRequests, setAutoOpenedRequests] = useState(false)
-  const [smsKey, setSmsKey] = useState('')
-  const [smsBusy, setSmsBusy] = useState(false)
-  const [smsNote, setSmsNote] = useState('')
 
   function loadHq() {
     api<AdminOverview>('/api/admin/overview')
       .then(setData)
       .catch((err) => setError(err instanceof Error ? err.message : 'Could not load HQ'))
-  }
-
-  async function saveSmsKey() {
-    setSmsBusy(true)
-    setSmsNote('')
-    try {
-      await api('/api/admin/sms-key', { method: 'POST', body: JSON.stringify({ key: smsKey }) })
-      setSmsKey('')
-      setSmsNote('Signup OTP SMS is on.')
-      loadHq()
-    } catch (err) {
-      setSmsNote(err instanceof Error ? err.message : 'Could not save the key')
-    } finally {
-      setSmsBusy(false)
-    }
   }
 
   useEffect(() => {
@@ -358,43 +340,6 @@ export function Admin() {
             Paying and trial desks, the couples they booked, and site traffic only you can see.
           </p>
         </div>
-
-        {data && !data.smsReady ? (
-          <form
-            className="space-y-3 rounded-2xl border border-gold/40 bg-gold/8 p-5"
-            onSubmit={(e) => {
-              e.preventDefault()
-              void saveSmsKey()
-            }}
-          >
-            <p className="text-sm font-medium text-gold-soft">Signup OTP is off until India SMS is connected</p>
-            <p className="text-sm text-mute">
-              Free US SMS cannot text Indian mobiles. Create a free key at{' '}
-              <a href="https://2factor.in" className="text-gold-soft underline" target="_blank" rel="noreferrer">
-                2factor.in
-              </a>
-              , then paste it here. Customers then get a 6-digit SMS, not email.
-            </p>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <input
-                className={fieldClass}
-                type="password"
-                autoComplete="off"
-                placeholder="2Factor API key"
-                value={smsKey}
-                onChange={(e) => setSmsKey(e.target.value.trim())}
-              />
-              <button
-                type="submit"
-                className="cursor-pointer rounded-full bg-gold px-4 py-2 text-sm text-ink disabled:opacity-50"
-                disabled={smsBusy || smsKey.length < 8}
-              >
-                {smsBusy ? 'Saving…' : 'Connect SMS'}
-              </button>
-            </div>
-            {smsNote ? <p className="text-sm text-gold-soft">{smsNote}</p> : null}
-          </form>
-        ) : null}
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
           {(
