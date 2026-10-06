@@ -51,24 +51,16 @@ export function Signup() {
 
   async function sendCode() {
     const phoneMsg = phoneError(phone)
-    const mailMsg = emailError(email)
-    setErrors((p) => ({ ...p, phone: phoneMsg, email: mailMsg, otp: '' }))
+    setErrors((p) => ({ ...p, phone: phoneMsg, otp: '' }))
     setError('')
-    if (phoneMsg || mailMsg) return
+    if (phoneMsg) return
     setSending(true)
     try {
-      const data = await api<{ ok: boolean; sms?: boolean; mailed?: boolean }>('/api/auth/otp-send', {
-        method: 'POST',
-        body: JSON.stringify({ phone, email }),
-      })
+      await api('/api/auth/otp-send', { method: 'POST', body: JSON.stringify({ phone }) })
       setPhoneVerified(false)
       setOtp('')
       setOtpSent(true)
-      setOtpHint(
-        data.sms
-          ? 'Code sent to your mobile. Valid 10 minutes.'
-          : 'Check your email (and spam) for the 6-digit code. SMS may follow.',
-      )
+      setOtpHint('Code sent to your mobile. Valid 10 minutes.')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not send the code')
     } finally {
@@ -183,7 +175,7 @@ export function Signup() {
               required
             />
           </Field>
-          <Field label="WhatsApp / phone" error={errors.phone} hint="10-digit Indian mobile. We send a free OTP before the desk opens." required>
+          <Field label="WhatsApp / phone" error={errors.phone} hint="10-digit Indian mobile. We text a 6-digit OTP here." required>
             <div className="flex flex-col gap-2 sm:flex-row">
               <input
                 required

@@ -6,7 +6,7 @@ import type { AuditRow, TenantPublic } from './db.ts'
 import { DEMO_EMAIL, isAdminEmail } from './constants.ts'
 import { billingStatus, todayIso } from './plans.ts'
 
-const SKIP = new Set(['admin.overview', 'logout', 'login.fail', 'login.lockout', 'authz.denied'])
+const SKIP = new Set(['admin.overview', 'admin.sms-key', 'logout', 'login.fail', 'login.lockout', 'authz.denied'])
 
 const LABELS: Record<string, string> = {
   register: 'Started a 14-day trial',

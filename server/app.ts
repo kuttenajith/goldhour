@@ -27,7 +27,7 @@ import {
   webhookSignature,
 } from './crypto.ts'
 import { emptyStudio, getStore, type AuditRow, type UserRow } from './db.ts'
-import { mailDirect, mailUser } from './mail.ts'
+import { mailUser } from './mail.ts'
 import { hqNotices, studioNotices } from './notices.ts'
 import { mailNewHqNotices } from './noticeMail.ts'
 import {
@@ -42,7 +42,7 @@ import {
   notifyStudioSignup,
   notifyTrialWelcome,
 } from './notify.ts'
-import { indiaMobile, newOtpCode, otpHash, sendOtpSms } from './otp.ts'
+import { indiaMobile, otpHash, sendPhoneOtp, TF_PREFIX, verify2Factor } from './otp.ts'
 import { pendingPlanRequest } from './planRequests.ts'
 import { PLANS, addDays, billingStatus, todayIso, trialEnd, type PaidPlanId } from './plans.ts'
 import { emailOk, passwordOk, studioPayloadTooLarge, validateLeads, validateQuotations, validateStudioProfile } from './validate.ts'
@@ -291,11 +291,9 @@ app.onError((err, c) => {
 })
 
 app.post('/auth/otp-send', async (c) => {
-  const body = await readJson<{ phone?: string; email?: string }>(c)
+  const body = await readJson<{ phone?: string }>(c)
   const mobile = indiaMobile(body.phone || '')
-  const email = (body.email || '').trim().toLowerCase()
   if (!mobile) return c.json({ error: 'Enter a 10-digit Indian mobile number.' }, 400)
-  if (!emailOk(email)) return c.json({ error: 'Enter the studio email first so we can also send the code there.' }, 400)
   const db = getStore()
   const existing = await db.getPhoneOtp(mobile)
   const gapMs = 8_000
@@ -304,26 +302,27 @@ app.post('/auth/otp-send', async (c) => {
     const wait = Math.max(1, Math.ceil((gapMs - elapsed) / 1000))
     return c.json({ error: `Wait ${wait} second${wait === 1 ? '' : 's'}, then tap Send OTP again.` }, 429)
   }
-  const code = newOtpCode()
-  const sms = await sendOtpSms(mobile, code)
-  const mailed = await mailDirect(
-    email,
-    'GoldHour mobile code',
-    `Your GoldHour confirmation code is ${code}. It is valid for 10 minutes.\n\nIf you did not ask for this, ignore it.`,
-  )
-  if (!sms && !mailed) {
-    return c.json({ error: 'Could not send the code yet. Tap Send OTP again — we will retry SMS and email.' }, 502)
+  const twoFactorKey = (process.env.TWOFACTOR_API_KEY || '').trim() || (await db.getSetting('twofactor_api_key')) || ''
+  const fast2smsKey = (process.env.FAST2SMS_API_KEY || '').trim()
+  const sent = await sendPhoneOtp({ phone: mobile, twoFactorKey, fast2smsKey })
+  if (!sent.ok) {
+    const error =
+      sent.reason === 'no-provider'
+        ? 'SMS is not connected yet. HQ must paste a 2Factor API key, then try again.'
+        : 'Could not send SMS to this number. Check the number and tap Send OTP again.'
+    return c.json({ error }, 502)
   }
   const now = new Date()
+  const codeHash = 'sessionId' in sent ? `${TF_PREFIX}${sent.sessionId}` : otpHash(mobile, sent.code)
   await db.putPhoneOtp({
     phone: mobile,
-    codeHash: otpHash(mobile, code),
+    codeHash,
     expiresAt: new Date(now.getTime() + 10 * 60 * 1000).toISOString(),
     verifiedAt: null,
     sentAt: now.toISOString(),
     tries: 0,
   })
-  return c.json({ ok: true, sms, mailed })
+  return c.json({ ok: true, sms: true })
 })
 
 app.post('/auth/otp-verify', async (c) => {
@@ -338,7 +337,13 @@ app.post('/auth/otp-verify', async (c) => {
   if (new Date(row.expiresAt).getTime() < Date.now()) {
     return c.json({ error: 'That code expired. Send a new one.' }, 400)
   }
-  const match = row.codeHash === otpHash(mobile, code)
+  const match = row.codeHash.startsWith(TF_PREFIX)
+    ? await verify2Factor(
+        (process.env.TWOFACTOR_API_KEY || '').trim() || (await db.getSetting('twofactor_api_key')) || '',
+        row.codeHash.slice(TF_PREFIX.length),
+        code,
+      )
+    : row.codeHash === otpHash(mobile, code)
   await db.putPhoneOtp({
     ...row,
     tries: row.tries + 1,
@@ -1007,6 +1012,11 @@ app.get('/admin/overview', async (c) => {
   )
   return c.json({
     isAdmin: true,
+    smsReady: Boolean(
+      (process.env.TWOFACTOR_API_KEY || '').trim() ||
+        (process.env.FAST2SMS_API_KEY || '').trim() ||
+        (await db.getSetting('twofactor_api_key')),
+    ),
     tenants: mapped.map((item) => item.tenant),
   })
 })
@@ -1028,6 +1038,20 @@ app.get('/admin/audit', async (c) => {
       studioId: r.studioId,
     })),
   })
+})
+
+app.post('/admin/sms-key', async (c) => {
+  const actor = await actorFrom(c)
+  if (!actor) return c.json({ error: 'Sign in required' }, 401)
+  if (!isAdminEmail(actor.user.email) && actor.user.role !== 'hq') {
+    return c.json({ error: "You don't have permission to perform this action." }, 403)
+  }
+  const body = await readJson<{ key?: string }>(c)
+  const key = (body.key || '').trim()
+  if (key.length < 8) return c.json({ error: 'Paste the 2Factor API key from 2factor.in.' }, 400)
+  await getStore().putSetting('twofactor_api_key', key)
+  await audit({ action: 'admin.sms-key', userId: actor.user.id, ip: clientIp(c), detail: '2factor' })
+  return c.json({ ok: true, smsReady: true })
 })
 
 app.post('/admin/activate-plan', async (c) => {

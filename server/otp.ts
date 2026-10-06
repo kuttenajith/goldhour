@@ -17,26 +17,47 @@ export function otpHash(phone: string, code: string) {
   return hashToken(`${phone}:${code}`)
 }
 
+export const TF_PREFIX = 'tf:'
+
 async function postJson(url: string, init: RequestInit) {
   const res = await fetch(url, init)
   const body = await res.text().catch(() => '')
-  if (!res.ok) console.error('goldhour-otp-http', res.status, url, body.slice(0, 180))
+  if (!res.ok) console.error('goldhour-otp-http', res.status, url.slice(0, 80), body.slice(0, 180))
   return { ok: res.ok, body }
 }
 
-async function via2Factor(phone: string, code: string) {
-  const key = process.env.TWOFACTOR_API_KEY || ''
-  if (!key) return false
-  const { ok, body } = await postJson(
-    `https://2factor.in/API/V1/${encodeURIComponent(key)}/SMS/91${phone}/${encodeURIComponent(code)}/GoldHour`,
-    { method: 'GET' },
-  )
-  return ok && !body.toLowerCase().includes('error')
+function parseJson(body: string) {
+  try {
+    return JSON.parse(body) as Record<string, unknown>
+  } catch {
+    return null
+  }
 }
 
-async function viaFast2Sms(phone: string, message: string) {
-  const key = process.env.FAST2SMS_API_KEY || ''
-  if (!key) return false
+/** 2Factor AUTOGEN — they create and SMS the code. Returns session id. */
+async function via2FactorAutogen(key: string, phone: string) {
+  const { ok, body } = await postJson(
+    `https://2factor.in/API/V1/${encodeURIComponent(key)}/SMS/91${phone}/AUTOGEN`,
+    { method: 'GET' },
+  )
+  const json = parseJson(body)
+  const status = String(json?.Status || '')
+  const details = String(json?.Details || '')
+  if (ok && status.toLowerCase() === 'success' && details) return details
+  console.error('goldhour-otp-2factor', status, details.slice(0, 160) || body.slice(0, 160))
+  return ''
+}
+
+export async function verify2Factor(key: string, sessionId: string, code: string) {
+  const { ok, body } = await postJson(
+    `https://2factor.in/API/V1/${encodeURIComponent(key)}/SMS/VERIFY/${encodeURIComponent(sessionId)}/${encodeURIComponent(code)}`,
+    { method: 'GET' },
+  )
+  const json = parseJson(body)
+  return ok && String(json?.Status || '').toLowerCase() === 'success'
+}
+
+async function viaFast2Sms(key: string, phone: string, message: string) {
   const { ok, body } = await postJson('https://www.fast2sms.com/dev/bulkV2', {
     method: 'POST',
     headers: { authorization: key, 'Content-Type': 'application/json' },
@@ -45,31 +66,24 @@ async function viaFast2Sms(phone: string, message: string) {
   return ok && !body.toLowerCase().includes('"return":false')
 }
 
-async function viaTextbelt(phone: string, message: string) {
-  const key = process.env.TEXTBELT_KEY || 'textbelt'
-  const { ok, body } = await postJson('https://textbelt.com/text', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ phone: `+91${phone}`, message, key }),
-  })
-  return ok && body.includes('"success":true')
-}
+export type OtpSendResult =
+  | { ok: true; sessionId: string }
+  | { ok: true; code: string }
+  | { ok: false; reason: string }
 
-export async function sendOtpSms(phone: string, code: string) {
-  const mobile = indiaMobile(phone)
-  if (!mobile) return false
-  const message = `GoldHour code ${code}. Valid 10 minutes. Do not share.`
-  const twofactor = await via2Factor(mobile, code).catch(() => false)
-  if (twofactor) {
-    console.info('goldhour-otp-sms', { twofactor: true })
-    return true
+export async function sendPhoneOtp(opts: { phone: string; twoFactorKey: string; fast2smsKey: string }): Promise<OtpSendResult> {
+  const mobile = indiaMobile(opts.phone)
+  if (!mobile) return { ok: false, reason: 'bad-phone' }
+  if (opts.twoFactorKey) {
+    const sessionId = await via2FactorAutogen(opts.twoFactorKey, mobile)
+    if (sessionId) return { ok: true, sessionId }
+    return { ok: false, reason: '2factor' }
   }
-  const fast2sms = await viaFast2Sms(mobile, message).catch(() => false)
-  if (fast2sms) {
-    console.info('goldhour-otp-sms', { fast2sms: true })
-    return true
+  if (opts.fast2smsKey) {
+    const code = newOtpCode()
+    const sent = await viaFast2Sms(opts.fast2smsKey, mobile, `GoldHour code ${code}. Valid 10 minutes. Do not share.`)
+    if (sent) return { ok: true, code }
+    return { ok: false, reason: 'fast2sms' }
   }
-  const textbelt = await viaTextbelt(mobile, message).catch(() => false)
-  console.info('goldhour-otp-sms', { twofactor: false, fast2sms: false, textbelt })
-  return textbelt
+  return { ok: false, reason: 'no-provider' }
 }

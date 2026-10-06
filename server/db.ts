@@ -126,6 +126,8 @@ export type Store = {
   releaseMailed(ids: string[]): Promise<void>
   putPhoneOtp(row: PhoneOtpRow): Promise<void>
   getPhoneOtp(phone: string): Promise<PhoneOtpRow | null>
+  getSetting(key: string): Promise<string | null>
+  putSetting(key: string, value: string): Promise<void>
 }
 
 function mapUser(row: Partial<UserRow> & { id: string; email: string; passwordHash?: string; password_hash?: string; createdAt?: string; created_at?: string; emailVerifiedAt?: string | null; email_verified_at?: string | null; role?: string }): UserRow {
@@ -227,6 +229,7 @@ type FileShape = {
   audit: AuditRow[]
   mailed: string[]
   otps: PhoneOtpRow[]
+  settings: Record<string, string>
 }
 
 function fileStore(path: string): Store {
@@ -241,6 +244,7 @@ function fileStore(path: string): Store {
     audit: [],
     mailed: [],
     otps: [],
+    settings: {},
   })
 
   function read(): FileShape {
@@ -444,6 +448,14 @@ function fileStore(path: string): Store {
     async getPhoneOtp(phone) {
       return (read().otps || []).find((item) => item.phone === phone) ?? null
     },
+    async getSetting(key) {
+      return (read().settings || {})[key] || null
+    },
+    async putSetting(key, value) {
+      const db = read()
+      db.settings = { ...(db.settings || {}), [key]: value }
+      write(db)
+    },
   }
   return store
 }
@@ -538,6 +550,10 @@ function postgresStore(url: string): Store {
         verified_at timestamptz,
         sent_at timestamptz NOT NULL,
         tries integer NOT NULL DEFAULT 0
+      )`
+      await sql`CREATE TABLE IF NOT EXISTS app_settings (
+        key text PRIMARY KEY,
+        value text NOT NULL
       )`
     },
     async findUserByEmail(email) {
@@ -738,6 +754,15 @@ function postgresStore(url: string): Store {
         sentAt: String(row.sentAt),
         tries: Number(row.tries || 0),
       }
+    },
+    async getSetting(key) {
+      const rows = await sql`SELECT value FROM app_settings WHERE key = ${key}`
+      const value = (rows[0] as { value?: string } | undefined)?.value
+      return value || null
+    },
+    async putSetting(key, value) {
+      await sql`INSERT INTO app_settings (key, value) VALUES (${key}, ${value})
+        ON CONFLICT (key) DO UPDATE SET value = excluded.value`
     },
   }
   return store

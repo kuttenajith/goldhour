@@ -126,6 +126,7 @@ export interface AdminTenant {
 
 export interface AdminOverview {
   isAdmin: true
+  smsReady?: boolean
   tenants: AdminTenant[]
 }
 
