@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { Field, fieldBox } from './Field.tsx'
+import { DateField } from './DateField.tsx'
 import { Button } from './Button.tsx'
 import { defaultEvents, FUNCTION_NAMES, splitPlan } from '../lib/booking.ts'
 import { id } from '../lib/ids.ts'
 import { todayIso } from '../lib/format.ts'
 import {
   dateError,
+  dateHorizon,
   dateMinFor,
   moneyError,
   nameError,
@@ -54,6 +56,7 @@ export function LeadForm({
   const [errors, setErrors] = useState({ coupleName: '', phone: '', eventDate: '', venue: '', city: '', budget: '', notes: '' })
   const selected = lead.events.map((ev) => ev.name)
   const minDate = dateMinFor(initial?.eventDate)
+  const maxDate = dateHorizon(8)
   const budgetText = lead.budget ? String(lead.budget) : ''
 
   function toggleFunction(name: string) {
@@ -74,7 +77,7 @@ export function LeadForm({
     const nextErrors = {
       coupleName: nameError(lead.coupleName),
       phone: phoneError(lead.phone),
-      eventDate: dateError(lead.eventDate, minDate),
+      eventDate: dateError(lead.eventDate, minDate, maxDate),
       venue: requiredText(lead.venue, 'the venue'),
       city: requiredText(lead.city, 'the city'),
       budget: moneyError(budgetText),
@@ -109,6 +112,7 @@ export function LeadForm({
           }}
           placeholder="Priya & Arjun"
           autoComplete="name"
+          maxLength={80}
         />
       </Field>
       <Field label="Phone" error={errors.phone} hint="10-digit Indian mobile" required>
@@ -124,19 +128,19 @@ export function LeadForm({
             setErrors((prev) => ({ ...prev, phone: phone ? phoneError(phone) : '' }))
           }}
           placeholder="98765 01234"
+          maxLength={13}
         />
       </Field>
-      <Field label="Wedding date" error={errors.eventDate} required>
-        <input
+      <Field label="Wedding date" error={errors.eventDate} hint="Use the calendar — today through 8 years" required>
+        <DateField
           required
-          type="date"
           min={minDate}
-          className={fieldBox(errors.eventDate)}
+          max={maxDate}
+          error={errors.eventDate}
           value={lead.eventDate}
-          onChange={(e) => {
-            const eventDate = e.target.value
+          onChange={(eventDate, eventError) => {
             setLead({ ...lead, eventDate })
-            setErrors((prev) => ({ ...prev, eventDate: dateError(eventDate, minDate) }))
+            setErrors((prev) => ({ ...prev, eventDate: eventError }))
           }}
         />
       </Field>
@@ -151,6 +155,7 @@ export function LeadForm({
             setErrors((prev) => ({ ...prev, venue: venue ? requiredText(venue, 'the venue') : '' }))
           }}
           placeholder="Temple / palace / lawn"
+          maxLength={80}
         />
       </Field>
       <Field label="City" error={errors.city} required>
@@ -164,6 +169,7 @@ export function LeadForm({
             setErrors((prev) => ({ ...prev, city: city ? requiredText(city, 'the city') : '' }))
           }}
           placeholder="Madurai"
+          maxLength={60}
         />
       </Field>
       <Field label="Budget" error={errors.budget} hint="Numbers only, rupees" required>
@@ -178,6 +184,7 @@ export function LeadForm({
             setErrors((prev) => ({ ...prev, budget: raw ? moneyError(raw) : '' }))
           }}
           placeholder="150000"
+          maxLength={9}
         />
       </Field>
       <div className="sm:col-span-2">
@@ -243,6 +250,7 @@ export function LeadForm({
               setErrors((prev) => ({ ...prev, notes: notes ? requiredText(notes, 'a short note') : '' }))
             }}
             placeholder="What they asked on WhatsApp"
+            maxLength={500}
           />
         </Field>
       </div>

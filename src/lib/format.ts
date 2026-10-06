@@ -55,6 +55,15 @@ export function addDays(iso: string, days: number) {
   return `${y}-${m}-${dayN}`
 }
 
+export function addYears(iso: string, years: number) {
+  const [y, m, d] = iso.split('-').map(Number)
+  const next = new Date(y + years, (m || 1) - 1, d || 1)
+  const yy = next.getFullYear()
+  const mm = String(next.getMonth() + 1).padStart(2, '0')
+  const dd = String(next.getDate()).padStart(2, '0')
+  return `${yy}-${mm}-${dd}`
+}
+
 export function paid(lead: Lead) {
   return lead.payments.reduce((sum, p) => sum + p.amount, 0)
 }

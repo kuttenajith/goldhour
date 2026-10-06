@@ -4,14 +4,15 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Check, MessageCircle, Plus } from 'lucide-react'
 import { Button } from '../components/Button.tsx'
 import { Field, fieldBox } from '../components/Field.tsx'
+import { DateField } from '../components/DateField.tsx'
 import { LeadForm } from '../components/LeadForm.tsx'
 import { Modal } from '../components/Modal.tsx'
 import { Pipeline } from '../components/Pipeline.tsx'
 import { StatusPill } from '../components/StatusPill.tsx'
 import { paidOf, splitPlan, weddingEvent } from '../lib/booking.ts'
-import { addDays, clock, day, money, paid, PAYMENT_LABEL, todayIso } from '../lib/format.ts'
+import { addDays, addYears, clock, day, money, paid, PAYMENT_LABEL, todayIso } from '../lib/format.ts'
 import { id } from '../lib/ids.ts'
-import { moneyError, onlyMoney, requiredText } from '../lib/input.ts'
+import { dateError, moneyError, onlyMoney, requiredText } from '../lib/input.ts'
 import { downloadQuotation } from '../lib/pdf.ts'
 import {
   addPayment,
@@ -443,8 +444,9 @@ function TimelineBoard({
             <input
               className="bg-transparent text-sm outline-none"
               value={slot.title}
+              maxLength={80}
               onChange={(e) =>
-                onChange(slots.map((s) => (s.id === slot.id ? { ...s, title: e.target.value } : s)))
+                onChange(slots.map((s) => (s.id === slot.id ? { ...s, title: e.target.value.slice(0, 80) } : s)))
               }
             />
             <button
@@ -477,19 +479,25 @@ function PaymentModal({
   const [amount, setAmount] = useState('')
   const [kind, setKind] = useState<PaymentKind>('advance')
   const [note, setNote] = useState('')
+  const [receivedOn, setReceivedOn] = useState(todayIso())
+  const [dateHint, setDateHint] = useState('')
   const [error, setError] = useState('')
+  const minDate = addYears(todayIso(), -3)
+  const maxDate = todayIso()
 
   function submit(e: FormEvent) {
     e.preventDefault()
     const msg = moneyError(amount)
     const noteMsg = requiredText(note, 'a payment note')
+    const when = dateError(receivedOn, minDate, maxDate)
     setError(msg || noteMsg)
-    if (msg || noteMsg) return
+    setDateHint(when)
+    if (msg || noteMsg || when) return
     onSave({
       id: id(),
       amount: Number(amount),
       kind,
-      receivedOn: todayIso(),
+      receivedOn,
       note,
     })
   }
@@ -503,6 +511,7 @@ function PaymentModal({
             inputMode="numeric"
             className={fieldBox(error)}
             value={amount}
+            maxLength={9}
             onChange={(e) => {
               const next = onlyMoney(e.target.value)
               setAmount(next)
@@ -523,11 +532,25 @@ function PaymentModal({
             <option value="extra">{PAYMENT_LABEL.extra}</option>
           </select>
         </Field>
+        <Field label="Received on" error={dateHint} hint="Today or up to 3 years back" required>
+          <DateField
+            required
+            min={minDate}
+            max={maxDate}
+            error={dateHint}
+            value={receivedOn}
+            onChange={(next, err) => {
+              setReceivedOn(next)
+              setDateHint(err)
+            }}
+          />
+        </Field>
         <Field label="Note" error={error.includes('note') ? error : ''} required>
           <input
             required
             className={fieldBox()}
             value={note}
+            maxLength={80}
             onChange={(e) => setNote(e.target.value.slice(0, 80))}
             placeholder="UPI / cash / transfer"
           />
@@ -584,6 +607,7 @@ function QuoteModal({
             required
             className={fieldBox()}
             value={packageName}
+            maxLength={80}
             onChange={(e) => setPackageName(e.target.value.slice(0, 80))}
           />
         </Field>
@@ -593,6 +617,7 @@ function QuoteModal({
             inputMode="numeric"
             className={fieldBox(error)}
             value={amount}
+            maxLength={9}
             onChange={(e) => {
               const next = onlyMoney(e.target.value)
               setAmount(next)
@@ -605,6 +630,7 @@ function QuoteModal({
             required
             className={fieldBox() + ' min-h-24'}
             value={notes}
+            maxLength={500}
             onChange={(e) => setNotes(e.target.value.slice(0, 500))}
           />
         </Field>

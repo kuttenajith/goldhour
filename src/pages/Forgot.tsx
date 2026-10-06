@@ -52,6 +52,7 @@ export function Forgot() {
                   setHint(v.includes('@') ? emailError(v) : '')
                 }}
                 required
+                maxLength={120}
               />
             </Field>
             {error ? <p className="text-sm text-orange-200">{error}</p> : null}
@@ -121,6 +122,7 @@ export function Reset() {
                   setHint(v ? passwordError(v) : '')
                 }}
                 minLength={8}
+                maxLength={128}
                 required
               />
             </Field>

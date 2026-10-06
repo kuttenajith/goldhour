@@ -1,5 +1,6 @@
 import type { Lead, LeadSource, LeadStatus, PaymentKind, Quotation, ServiceType, StudioProfile } from '../src/lib/types.ts'
 import { normalizeLead } from '../src/lib/booking.ts'
+import { isRealIsoDate } from '../src/lib/input.ts'
 import { STUDIO_MAX_BYTES } from './constants.ts'
 
 const STATUS: LeadStatus[] = ['new', 'quoted', 'follow_up', 'no_response', 'accepted', 'booked', 'completed', 'lost']
@@ -23,7 +24,7 @@ function money(value: unknown) {
 
 function isoDate(value: unknown) {
   const s = String(value ?? '').slice(0, 10)
-  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : ''
+  return isRealIsoDate(s) ? s : ''
 }
 
 function uuid(value: unknown) {

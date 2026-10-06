@@ -73,6 +73,7 @@ export function Signup() {
             <input
               className={fieldBox(errors.studioName)}
               value={studioName}
+              maxLength={60}
               onChange={(e) => {
                 const v = e.target.value.slice(0, 60)
                 setStudioName(v)
@@ -87,6 +88,7 @@ export function Signup() {
                 required
                 className={fieldBox(errors.owner)}
                 value={owner}
+                maxLength={80}
                 onChange={(e) => {
                   const v = onlyName(e.target.value)
                   setOwner(v)
@@ -99,6 +101,7 @@ export function Signup() {
                 required
                 className={fieldBox(errors.city)}
                 value={city}
+                maxLength={60}
                 onChange={(e) => {
                   const v = onlyName(e.target.value)
                   setCity(v)
@@ -114,6 +117,7 @@ export function Signup() {
               className={fieldBox(errors.phone)}
               value={phone}
               inputMode="tel"
+              maxLength={13}
               onChange={(e) => {
                 const v = onlyPhone(e.target.value)
                 setPhone(v)
@@ -126,6 +130,7 @@ export function Signup() {
               className={fieldBox(errors.email)}
               type="email"
               value={email}
+              maxLength={120}
               onChange={(e) => {
                 const v = e.target.value.trim()
                 setEmail(v)
@@ -139,6 +144,7 @@ export function Signup() {
               className={fieldBox(errors.password)}
               type="password"
               value={password}
+              maxLength={128}
               onChange={(e) => {
                 const v = e.target.value
                 setPassword(v)

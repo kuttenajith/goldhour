@@ -100,6 +100,7 @@ export function StudioLogin() {
               type="email"
               autoComplete="email"
               placeholder="studio@email.com"
+              maxLength={120}
             />
           </Field>
           <Field label="Password" required>
@@ -110,6 +111,7 @@ export function StudioLogin() {
               onChange={(e) => setPassword(e.target.value)}
               type="password"
               autoComplete="current-password"
+              maxLength={128}
             />
           </Field>
           {error ? <p className="text-sm text-orange-200">{error}</p> : null}
@@ -137,6 +139,7 @@ export function StudioLogin() {
               onChange={(e) => setPin(onlyPhone(e.target.value).replace('+', '').slice(0, 4))}
               placeholder="2026"
               inputMode="numeric"
+              maxLength={4}
             />
           </Field>
           <Field label="Your email (optional)" error={demoEmailHint} hint="We’ll mail the trial details. PIN still opens the desk.">
@@ -150,6 +153,7 @@ export function StudioLogin() {
                 setDemoEmailHint(v.includes('@') ? emailError(v) : '')
               }}
               placeholder="studio@email.com"
+              maxLength={120}
             />
           </Field>
           <Button type="submit" tone="ghost" className="w-full" disabled={busy}>
