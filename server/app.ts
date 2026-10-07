@@ -778,8 +778,8 @@ app.post('/billing/checkout', async (c) => {
   } catch (err) {
     console.error('goldhour-notify-request', err)
   }
-  const keyId = process.env.RAZORPAY_KEY_ID
-  const keySecret = process.env.RAZORPAY_KEY_SECRET
+  const keyId = (process.env.RAZORPAY_KEY_ID || '').trim()
+  const keySecret = (process.env.RAZORPAY_KEY_SECRET || '').trim()
   if (!keyId || !keySecret) {
     return c.json({
       requested: true,
@@ -795,12 +795,32 @@ app.post('/billing/checkout', async (c) => {
       amount: plan.amountPaise,
       currency: 'INR',
       receipt,
-      notes: { userId: actor.user.id, plan: plan.id, studio: actor.studio.name },
+      notes: {
+        userId: String(actor.user.id),
+        plan: String(plan.id),
+        studio: String(actor.studio.name || '').slice(0, 240),
+      },
     }),
   })
-  const json = (await res.json()) as { id?: string; error?: { description?: string } }
+  const raw = await res.text()
+  let json: { id?: string; error?: { description?: string; code?: string } } = {}
+  try {
+    json = JSON.parse(raw) as typeof json
+  } catch {
+    json = {}
+  }
   if (!res.ok || !json.id) {
-    return c.json({ error: 'Could not start checkout. Try again.' }, 502)
+    const detail = String(json.error?.description || raw).slice(0, 180)
+    console.error('goldhour-razorpay-order', res.status, detail)
+    const authFail = res.status === 401 || /auth/i.test(detail)
+    return c.json(
+      {
+        error: authFail
+          ? 'Razorpay rejected these API keys. In Razorpay Dashboard open Test mode, generate a new Key ID + Key Secret pair, and send both again.'
+          : 'Could not start checkout. Try again.',
+      },
+      502,
+    )
   }
   await getStore().insertOrder({
     id: newId(),
@@ -838,7 +858,7 @@ app.post('/billing/checkout', async (c) => {
 app.post('/billing/confirm', async (c) => {
   const actor = await actorFrom(c)
   if (!actor) return c.json({ error: 'Sign in required' }, 401)
-  const secret = process.env.RAZORPAY_KEY_SECRET
+  const secret = (process.env.RAZORPAY_KEY_SECRET || '').trim()
   if (!secret) return c.json({ error: 'Card checkout is not connected yet. Ask HQ to start your plan now.' }, 503)
   const body = await readJson<{
     razorpay_order_id?: string
