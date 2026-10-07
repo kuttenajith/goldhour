@@ -4,6 +4,7 @@ import { dateClashes, morningBrief, staleQuotes } from '../src/lib/studioPulse.t
 import { pendingPlanRequest, planTitle } from './planRequests.ts'
 import type { AuditRow, TenantPublic } from './db.ts'
 import { DEMO_EMAIL, isAdminEmail } from './constants.ts'
+import { toDay, toIso } from './iso.ts'
 import { billingStatus, todayIso } from './plans.ts'
 
 const SKIP = new Set(['admin.overview', 'admin.sms-key', 'logout', 'login.fail', 'login.lockout', 'authz.denied'])
@@ -27,13 +28,11 @@ const LABELS: Record<string, string> = {
 }
 
 function asIso(value: unknown) {
-  if (!value) return ''
-  if (value instanceof Date) return value.toISOString()
-  return String(value)
+  return toIso(value)
 }
 
 function asDay(value: unknown) {
-  return asIso(value).slice(0, 10)
+  return toDay(value)
 }
 
 function daysBetween(from: string, to: string) {
@@ -241,7 +240,7 @@ export function studioNotices(opts: {
   return [...live, ...audit].sort((a, b) => String(b.at).localeCompare(String(a.at))).slice(0, 200)
 }
 
-export function hqNotices(opts: { tenants: TenantPublic[]; audit: AuditRow[] }): AppNotice[] {
+export function hqNotices(opts: { tenants: TenantPublic[]; audit: AuditRow[]; inbox?: AppNotice[] }): AppNotice[] {
   const today = todayIso()
   const byUser = new Map(opts.tenants.map((t) => [t.user.id, t]))
   const byStudio = new Map(opts.tenants.filter((t) => t.studio).map((t) => [t.studio!.id, t]))
@@ -286,17 +285,14 @@ export function hqNotices(opts: { tenants: TenantPublic[]; audit: AuditRow[] }):
           })
         }
       }
-      const created = asDay(t.user.createdAt)
-      if (created && daysBetween(created, today) <= 2) {
-        live.push({
-          id: `hq-new:${email}`,
-          title: `${name} joined`,
-          body: `${email} started a GoldHour desk`,
-          href: hqHref(email),
-          at: asIso(t.user.createdAt) || created,
-          sticky: true,
-        })
-      }
+      live.push({
+        id: `hq-new:${email}`,
+        title: `${name} joined`,
+        body: [email, t.studio?.phone, t.studio?.city, 'started a GoldHour desk'].filter(Boolean).join(' · '),
+        href: hqHref(email),
+        at: asIso(t.user.createdAt) || new Date().toISOString(),
+        sticky: true,
+      })
       const leads = Array.isArray(t.studio?.leads) ? t.studio.leads : []
       const quotes = Array.isArray(t.studio?.quotations) ? t.studio.quotations : []
       for (const lead of leads) {
@@ -351,5 +347,12 @@ export function hqNotices(opts: { tenants: TenantPublic[]; audit: AuditRow[] }):
     console.error('goldhour-hq-notice-audit', err)
   }
 
-  return [...live, ...audit].sort((a, b) => String(b.at).localeCompare(String(a.at))).slice(0, 200)
+  const seen = new Set<string>()
+  const merged: AppNotice[] = []
+  for (const notice of [...(opts.inbox || []), ...live, ...audit]) {
+    if (!notice?.id || seen.has(notice.id)) continue
+    seen.add(notice.id)
+    merged.push({ ...notice, at: asIso(notice.at) || String(notice.at || '') })
+  }
+  return merged.sort((a, b) => String(b.at).localeCompare(String(a.at))).slice(0, 200)
 }

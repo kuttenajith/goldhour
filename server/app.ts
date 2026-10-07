@@ -28,8 +28,8 @@ import {
 } from './crypto.ts'
 import { emptyStudio, getStore, type AuditRow, type UserRow } from './db.ts'
 import { mailUser } from './mail.ts'
+import { syncHqInbox } from './noticeMail.ts'
 import { hqNotices, studioNotices } from './notices.ts'
-import { mailNewHqNotices } from './noticeMail.ts'
 import {
   notifyCheckout,
   notifyDemoOpened,
@@ -909,12 +909,13 @@ app.get('/notices', async (c) => {
   if (hq) {
     try {
       const [tenants, audit] = await Promise.all([db.listTenants(), billingAwareAudit()])
-      const notices = hqNotices({ tenants, audit })
       try {
-        await mailNewHqNotices(notices)
+        await syncHqInbox(tenants)
       } catch (err) {
-        console.error('goldhour-notices-mail', err)
+        console.error('goldhour-notices-sync', err)
       }
+      const inbox = await db.listHqNotices().catch(() => [])
+      const notices = hqNotices({ tenants, audit, inbox })
       return c.json({ notices })
     } catch (err) {
       console.error('goldhour-notices', err)

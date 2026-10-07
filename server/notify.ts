@@ -1,9 +1,9 @@
 import type { Lead, Quotation, StudioProfile } from '../src/lib/types.ts'
 import { day, money, PAYMENT_LABEL, SERVICE_LABEL, SOURCE_LABEL, STATUS_LABEL } from '../src/lib/format.ts'
-import { APP_URL, isAdminEmail } from './constants.ts'
-import { getStore } from './db.ts'
-import { mailAdmin, mailUser, noticeCardHtml } from './mail.ts'
-import { hqLeadNoticeId, hqPlanRequestId } from './notices.ts'
+import { isAdminEmail } from './constants.ts'
+import { mailAdmin, mailUser } from './mail.ts'
+import { hqJoinNotice, hqLeadItem, pushHqNotice } from './noticeMail.ts'
+import { hqPlanRequestId } from './notices.ts'
 import { demoFollowLetter, trialWelcomeLetter } from './letters.ts'
 
 export { isAdminEmail }
@@ -78,16 +78,15 @@ export async function notifyHq(subject: string, message: string, replyTo?: strin
 
 export async function notifyStudioSignup(studio: StudioProfile, email: string) {
   if (isAdminEmail(email)) return
-  const href = `/admin?studio=${encodeURIComponent(email)}`
-  const title = `${studio.name} joined`
-  const body = `${email} started a GoldHour desk`
-  const ok = await notifyHq(
-    `[GOLDHOUR] ${title}`,
-    block(studio, email, [body, 'A photographer opened a GoldHour trial desk.']),
-    email,
-    noticeCardHtml([{ title, body, href }]),
+  await pushHqNotice(
+    hqJoinNotice({
+      email,
+      name: studio.name,
+      phone: studio.phone,
+      city: studio.city,
+      owner: studio.owner,
+    }),
   )
-  if (ok) await getStore().claimUnmailed([`hq-new:${email}`])
 }
 
 export async function notifyTrialWelcome(opts: {
@@ -201,27 +200,11 @@ export async function notifyLeadChanges(opts: {
     )
   }
 
-  const headline = added[0]?.coupleName || changed[0]?.coupleName || removed[0]?.coupleName || opts.studio.name
-  const cards = [
-    ...added.map((lead) => ({
-      title: `${opts.studio.name} · new enquiry · ${lead.coupleName}`,
-      body: formatLead(lead),
-      href: `/admin?studio=${encodeURIComponent(opts.email)}`,
-    })),
-    ...changed.map((lead) => ({
-      title: `${opts.studio.name} · updated · ${lead.coupleName}`,
-      body: formatLead(lead),
-      href: `/admin?studio=${encodeURIComponent(opts.email)}`,
-    })),
-  ]
-  const ok = await notifyHq(
-    `[GOLDHOUR] ${opts.studio.name} · ${headline}`,
-    blocks.join('\n'),
-    opts.email,
-    cards.length ? noticeCardHtml(cards) : undefined,
-  )
-  if (ok) {
-    await getStore().claimUnmailed(added.map((lead) => hqLeadNoticeId(opts.email, lead.id)))
+  for (const lead of [...added, ...changed]) {
+    await pushHqNotice(hqLeadItem(opts.email, opts.studio.name, lead))
+  }
+  if (!added.length && (removed.length || quotesChanged)) {
+    await notifyHq(`[GOLDHOUR] ${opts.studio.name} · desk update`, blocks.join('\n'), opts.email)
   }
 }
 
@@ -236,18 +219,14 @@ export async function notifyPlanRequest(opts: {
   const href = `/admin?studio=${encodeURIComponent(opts.email)}`
   const title = `${opts.studio.name} asked for ${want}`
   const body = `${opts.email} · open HQ and switch the desk`
-  const ok = await notifyHq(
-    `[GOLDHOUR] ${title}`,
-    block(opts.studio, opts.email, [
-      body,
-      `They asked HQ to switch the desk to ${want}.`,
-      `Current plan: ${opts.current}`,
-      `Open HQ and tap Switch to ${want}: ${APP_URL}${href}`,
-    ]),
-    opts.email,
-    noticeCardHtml([{ title, body, href }]),
-  )
-  if (ok) await getStore().claimUnmailed([hqPlanRequestId(opts.email, opts.plan)])
+  await pushHqNotice({
+    id: hqPlanRequestId(opts.email, opts.plan),
+    title,
+    body,
+    href,
+    at: new Date().toISOString(),
+    sticky: true,
+  })
 }
 
 export async function notifyPlanApproved(studio: StudioProfile, email: string, plan: string) {

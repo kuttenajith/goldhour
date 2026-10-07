@@ -32,23 +32,41 @@ function parseJson(body: string) {
   }
 }
 
-function twoFactorOk(body: string, httpOk: boolean) {
-  const json = parseJson(body)
-  const status = String(json?.Status || '')
-  if (httpOk && status.toLowerCase() === 'success') return true
-  console.error('goldhour-otp-2factor', status, String(json?.Details || body).slice(0, 160))
-  return false
+function looksLikeVoice(body: string) {
+  return /voice|ivr|\bcall\b/i.test(body)
 }
 
-/** SMS only — never AUTOGEN/VOICE, which 2Factor falls back to a phone call. */
+function twoFactorSmsOk(body: string, httpOk: boolean) {
+  const json = parseJson(body)
+  const status = String(json?.Status || '')
+  const details = String(json?.Details || body)
+  if (!httpOk || status.toLowerCase() !== 'success') {
+    console.error('goldhour-otp-2factor', status, details.slice(0, 160))
+    return false
+  }
+  if (looksLikeVoice(details) || looksLikeVoice(body)) {
+    console.error('goldhour-otp-voice-rejected', details.slice(0, 160))
+    return false
+  }
+  return true
+}
+
+/** SMS only. Never AUTOGEN/VOICE — those are the phone-call path. */
 async function via2FactorSms(key: string, phone: string, code: string) {
-  const paths = [
-    `https://2factor.in/API/V1/${encodeURIComponent(key)}/SMS/91${phone}/${encodeURIComponent(code)}/OTP1`,
-    `https://2factor.in/API/V1/${encodeURIComponent(key)}/SMS/91${phone}/${encodeURIComponent(code)}`,
-  ]
-  for (const url of paths) {
-    const { ok, body } = await postJson(url)
-    if (twoFactorOk(body, ok)) return true
+  const template = (process.env.TWOFACTOR_SMS_TEMPLATE || 'OTP1').trim() || 'OTP1'
+  const keyPart = encodeURIComponent(key)
+  const otp = encodeURIComponent(code)
+  const tpl = encodeURIComponent(template)
+  const numbers = [phone, `91${phone}`, `+91${phone}`]
+  const attempts: { url: string; method: 'POST' | 'GET' }[] = []
+  for (const number of numbers) {
+    const n = encodeURIComponent(number)
+    attempts.push({ url: `https://2factor.in/API/V1/${keyPart}/SMS/${n}/${otp}/${tpl}`, method: 'POST' })
+    attempts.push({ url: `https://2factor.in/API/V1/${keyPart}/SMS/${n}/${otp}`, method: 'POST' })
+  }
+  for (const { url, method } of attempts) {
+    const { ok, body } = await postJson(url, { method })
+    if (twoFactorSmsOk(body, ok)) return true
   }
   return false
 }

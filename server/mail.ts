@@ -127,22 +127,24 @@ export async function mailAdmin(
 ): Promise<boolean> {
   const text = `${message}\n\nHQ: ${APP_URL}/admin\nApp: ${APP_URL}`
   const letter = html || noticeCardHtml([{ title: subject, body: message, href: '/admin' }])
-  const results = await Promise.all([
-    withBudget(viaSmtp(ADMIN_EMAIL, subject, text, letter)),
-    withBudget(viaResend(ADMIN_EMAIL, subject, text, letter)),
-    withBudget(viaFormsubmit(ADMIN_EMAIL, subject, text, replyTo)),
-    withBudget(viaWeb3forms(subject, text, replyTo)),
-  ])
-  const ok = results.some(Boolean)
-  console.info('goldhour-mail', {
-    subject,
-    smtp: Boolean(results[0]),
-    resend: Boolean(results[1]),
-    formsubmit: Boolean(results[2]),
-    web3forms: Boolean(results[3]),
-  })
-  if (!ok) console.error('goldhour-mail-all-failed', subject)
-  return ok
+  const flags = { smtp: false, resend: false, web3forms: false, formsubmit: false }
+  const attempts: Array<['smtp' | 'resend' | 'web3forms' | 'formsubmit', () => Promise<boolean | null>]> = [
+    ['smtp', () => withBudget(viaSmtp(ADMIN_EMAIL, subject, text, letter), 4000)],
+    ['resend', () => withBudget(viaResend(ADMIN_EMAIL, subject, text, letter), 4000)],
+    ['web3forms', () => withBudget(viaWeb3forms(subject, text, replyTo), 4000)],
+    ['formsubmit', () => withBudget(viaFormsubmit(ADMIN_EMAIL, subject, text, replyTo), 4000)],
+  ]
+  for (const [name, send] of attempts) {
+    const ok = Boolean(await send())
+    flags[name] = ok
+    if (ok) {
+      console.info('goldhour-mail', { subject, ...flags })
+      return true
+    }
+  }
+  console.info('goldhour-mail', { subject, ...flags })
+  console.error('goldhour-mail-all-failed', subject)
+  return false
 }
 
 /** Photographer inbox when Resend is set; HQ always gets a copy so nothing is silent. */

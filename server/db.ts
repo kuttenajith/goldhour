@@ -3,10 +3,11 @@ import { dirname, resolve } from 'node:path'
 import { neon, neonConfig } from '@neondatabase/serverless'
 
 neonConfig.fetchConnectionCache = true
-import type { Lead, Quotation, StudioProfile } from '../src/lib/types.ts'
+import type { AppNotice, Lead, Quotation, StudioProfile } from '../src/lib/types.ts'
 import { seedState } from '../src/lib/seed.ts'
 import { ADMIN_EMAIL, DEMO_EMAIL } from './constants.ts'
 import { hashPassword, newId } from './crypto.ts'
+import { toIso } from './iso.ts'
 
 export type UserRole = 'owner' | 'hq'
 
@@ -128,18 +129,19 @@ export type Store = {
   getPhoneOtp(phone: string): Promise<PhoneOtpRow | null>
   getSetting(key: string): Promise<string | null>
   putSetting(key: string, value: string): Promise<void>
+  upsertHqNotice(notice: AppNotice): Promise<void>
+  listHqNotices(): Promise<AppNotice[]>
 }
 
 function mapUser(row: Partial<UserRow> & { id: string; email: string; passwordHash?: string; password_hash?: string; createdAt?: string; created_at?: string; emailVerifiedAt?: string | null; email_verified_at?: string | null; role?: string }): UserRow {
   const email = String(row.email).toLowerCase()
-  const createdAt = String(row.createdAt || row.created_at || new Date().toISOString())
   const verified = row.emailVerifiedAt ?? row.email_verified_at ?? null
   return {
     id: row.id,
     email,
     passwordHash: row.passwordHash || row.password_hash || '',
-    createdAt,
-    emailVerifiedAt: verified ? String(verified) : null,
+    createdAt: toIso(row.createdAt || row.created_at, new Date().toISOString()),
+    emailVerifiedAt: verified ? toIso(verified) || null : null,
     role: row.role === 'hq' || email === ADMIN_EMAIL ? 'hq' : 'owner',
   }
 }
@@ -148,7 +150,18 @@ function publicUser(user: UserRow): TenantPublic['user'] {
   return {
     id: user.id,
     email: user.email,
-    createdAt: typeof user.createdAt === 'string' ? user.createdAt : new Date(user.createdAt).toISOString(),
+    createdAt: toIso(user.createdAt, new Date().toISOString()),
+  }
+}
+
+function mapHqNotice(row: Partial<AppNotice> & { id: string }): AppNotice {
+  return {
+    id: row.id,
+    title: String(row.title || ''),
+    body: String(row.body || ''),
+    href: String(row.href || '/admin'),
+    at: toIso(row.at, new Date().toISOString()),
+    sticky: Boolean(row.sticky),
   }
 }
 
@@ -230,6 +243,7 @@ type FileShape = {
   mailed: string[]
   otps: PhoneOtpRow[]
   settings: Record<string, string>
+  hqInbox: AppNotice[]
 }
 
 function fileStore(path: string): Store {
@@ -245,6 +259,7 @@ function fileStore(path: string): Store {
     mailed: [],
     otps: [],
     settings: {},
+    hqInbox: [],
   })
 
   function read(): FileShape {
@@ -456,6 +471,19 @@ function fileStore(path: string): Store {
       db.settings = { ...(db.settings || {}), [key]: value }
       write(db)
     },
+    async upsertHqNotice(notice) {
+      const db = read()
+      const row = mapHqNotice(notice)
+      db.hqInbox = (db.hqInbox || []).filter((item) => item.id !== row.id)
+      db.hqInbox.push(row)
+      write(db)
+    },
+    async listHqNotices() {
+      return [...(read().hqInbox || [])]
+        .map(mapHqNotice)
+        .sort((a, b) => b.at.localeCompare(a.at))
+        .slice(0, 200)
+    },
   }
   return store
 }
@@ -554,6 +582,14 @@ function postgresStore(url: string): Store {
       await sql`CREATE TABLE IF NOT EXISTS app_settings (
         key text PRIMARY KEY,
         value text NOT NULL
+      )`
+      await sql`CREATE TABLE IF NOT EXISTS hq_inbox (
+        id text PRIMARY KEY,
+        title text NOT NULL,
+        body text NOT NULL,
+        href text NOT NULL,
+        at timestamptz NOT NULL,
+        sticky boolean NOT NULL DEFAULT true
       )`
     },
     async findUserByEmail(email) {
@@ -716,7 +752,7 @@ function postgresStore(url: string): Store {
         : prefix
           ? await sql`SELECT id, studio_id AS "studioId", user_id AS "userId", action, detail, ip, created_at AS "createdAt" FROM audit_events WHERE action LIKE ${prefix} ORDER BY created_at DESC LIMIT ${limit}`
           : await sql`SELECT id, studio_id AS "studioId", user_id AS "userId", action, detail, ip, created_at AS "createdAt" FROM audit_events ORDER BY created_at DESC LIMIT ${limit}`
-      return (rows as AuditRow[]).map((r) => ({ ...r, createdAt: String(r.createdAt) }))
+      return (rows as AuditRow[]).map((r) => ({ ...r, createdAt: toIso(r.createdAt, new Date().toISOString()) }))
     },
     async claimUnmailed(ids) {
       const claimed: string[] = []
@@ -747,17 +783,12 @@ function postgresStore(url: string): Store {
       const rows = await sql`SELECT phone, code_hash AS "codeHash", expires_at AS "expiresAt", verified_at AS "verifiedAt", sent_at AS "sentAt", tries FROM phone_otps WHERE phone = ${phone}`
       const row = rows[0] as PhoneOtpRow | undefined
       if (!row) return null
-      const asIso = (value: unknown, empty: string | null) => {
-        const d = value instanceof Date ? value : new Date(String(value || ''))
-        if (Number.isNaN(d.getTime())) return empty
-        return d.toISOString()
-      }
       return {
         phone: String(row.phone),
         codeHash: String(row.codeHash || (row as { code_hash?: string }).code_hash || ''),
-        expiresAt: asIso(row.expiresAt, new Date().toISOString()) as string,
-        verifiedAt: asIso(row.verifiedAt, null),
-        sentAt: asIso(row.sentAt, new Date().toISOString()) as string,
+        expiresAt: toIso(row.expiresAt, new Date().toISOString()),
+        verifiedAt: row.verifiedAt ? toIso(row.verifiedAt) || null : null,
+        sentAt: toIso(row.sentAt, new Date().toISOString()),
         tries: Number(row.tries || 0),
       }
     },
@@ -769,6 +800,21 @@ function postgresStore(url: string): Store {
     async putSetting(key, value) {
       await sql`INSERT INTO app_settings (key, value) VALUES (${key}, ${value})
         ON CONFLICT (key) DO UPDATE SET value = excluded.value`
+    },
+    async upsertHqNotice(notice) {
+      const row = mapHqNotice(notice)
+      await sql`INSERT INTO hq_inbox (id, title, body, href, at, sticky)
+        VALUES (${row.id}, ${row.title}, ${row.body}, ${row.href}, ${row.at}, ${Boolean(row.sticky)})
+        ON CONFLICT (id) DO UPDATE SET
+          title = excluded.title,
+          body = excluded.body,
+          href = excluded.href,
+          at = excluded.at,
+          sticky = excluded.sticky`
+    },
+    async listHqNotices() {
+      const rows = await sql`SELECT id, title, body, href, at, sticky FROM hq_inbox ORDER BY at DESC LIMIT 200`
+      return (rows as AppNotice[]).map(mapHqNotice)
     },
   }
   return store

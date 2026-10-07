@@ -263,6 +263,14 @@ export function Admin() {
   const trial = live.filter((t) => t.billing.status === 'trialing')
   const requests = live.filter((t) => Boolean(t.billing.requestedPlan))
   const events = live.reduce((s, t) => s + t.leads.length, 0)
+  const joinNotices: AppNotice[] = live.map((t) => ({
+    id: `hq-new:${t.email}`,
+    title: `${t.studio.name} joined`,
+    body: [t.email, t.studio.phone, t.studio.city, 'started a GoldHour desk'].filter(Boolean).join(' · '),
+    href: `/admin?studio=${encodeURIComponent(t.email)}`,
+    at: t.createdAt,
+    sticky: true,
+  }))
   const requestNotices: AppNotice[] = requests.map((t) => ({
     id: `hq-request:${t.email}:${t.billing.requestedPlan}`,
     title: `${t.studio.name} asked for ${planName(t.billing.requestedPlan)}`,
@@ -314,7 +322,7 @@ export function Admin() {
           </span>
         </div>
         <div className="flex items-center gap-3 text-sm">
-          <NoticeBell extras={[...requestNotices, ...leadNotices]} />
+          <NoticeBell extras={[...joinNotices, ...requestNotices, ...leadNotices]} />
           <UserHello name={firstName(me)} />
           <Link to="/studio" className="text-gold-soft">
             My desk
