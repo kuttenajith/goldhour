@@ -15,7 +15,7 @@ import { UserHello } from '../components/UserHello.tsx'
 import type { AdminOverview, AdminTenant, AppNotice, Lead } from '../lib/types.ts'
 import { clsx } from '../lib/clsx.ts'
 
-type Filter = 'live' | 'paying' | 'trial' | 'request' | 'removed' | 'records' | 'all'
+type Filter = 'live' | 'paying' | 'trial' | 'request' | 'expired' | 'removed' | 'records' | 'all'
 
 function planName(id?: string | null) {
   if (id === 'studio_pro') return 'Studio Pro'
@@ -30,11 +30,16 @@ function kind(t: AdminTenant): Filter | 'hq' | 'demo' {
   if (t.isDemo) return 'demo'
   if (t.billing.status === 'active') return 'paying'
   if (t.billing.status === 'trialing') return 'trial'
+  if (t.billing.status === 'expired') return 'expired'
   return 'all'
 }
 
-function paidLive(t: AdminTenant) {
+function paidOnce(t: AdminTenant) {
   return t.billing.lastPayment?.status === 'paid'
+}
+
+function paidLive(t: AdminTenant) {
+  return t.billing.status === 'active' && paidOnce(t)
 }
 
 function LeadBlock({ lead }: { lead: Lead }) {
@@ -101,6 +106,8 @@ function StudioCard({
 }) {
   const paidOrder = tenant.billing.lastPayment
   const moneyIn = paidOrder?.status === 'paid'
+  const onStudio = tenant.billing.status === 'active' && tenant.billing.plan === 'studio'
+  const onPro = tenant.billing.status === 'active' && tenant.billing.plan === 'studio_pro'
   const [open, setOpen] = useState(Boolean(startsOpen) || Boolean(tenant.billing.requestedPlan) || moneyIn)
   const [planBusy, setPlanBusy] = useState<string | null>(null)
   const [deskBusy, setDeskBusy] = useState(false)
@@ -116,7 +123,7 @@ function StudioCard({
       ? 'Demo'
       : removed
         ? 'Removed'
-        : moneyIn || tenant.billing.status === 'active'
+        : tenant.billing.status === 'active'
           ? 'Paying'
           : tenant.billing.status === 'trialing'
             ? 'Trial'
@@ -208,31 +215,40 @@ function StudioCard({
           </dl>
           {moneyIn ? (
             <p className="rounded-xl border border-gold/40 bg-gold/10 px-4 py-3 text-sm text-gold-soft">
-              Payment complete: {planName(paidOrder?.plan)} · {money(Math.round((paidOrder?.amountPaise || 0) / 100))}
-              {paidOrder?.paidAt ? ` · ${when(paidOrder.paidAt)}` : ''}. The desk is live
-              {tenant.billing.status === 'active' ? ` until ${day(tenant.billing.periodEndsOn || '')}` : ''}. No approval needed.
+              Last payment: {planName(paidOrder?.plan)} · {money(Math.round((paidOrder?.amountPaise || 0) / 100))}
+              {paidOrder?.paidAt ? ` · ${when(paidOrder.paidAt)}` : ''}.
+              {tenant.billing.status === 'active'
+                ? ` Desk is live until ${day(tenant.billing.periodEndsOn || '')}. No approval needed.`
+                : ` Month ended${tenant.billing.periodEndsOn ? ` on ${day(tenant.billing.periodEndsOn)}` : ''}. They can renew from billing, or grant another month below.`}
               {paidOrder?.razorpayPaymentId ? (
                 <span className="mt-1 block text-xs text-mute">Razorpay {paidOrder.razorpayPaymentId}</span>
               ) : null}
             </p>
           ) : requested ? (
             <p className="rounded-xl border border-gold/40 bg-gold/10 px-4 py-3 text-sm text-gold-soft">
-              {tenant.email} asked for {planName(requested)}. Razorpay has not recorded a payment yet. Approve below only if you want to grant the plan without waiting.
+              {tenant.email} asked {requested === tenant.billing.plan ? 'to renew' : 'for'} {planName(requested)}. Razorpay has not recorded a payment yet. Approve below only if you want to grant the plan without waiting.
+            </p>
+          ) : tenant.billing.status === 'expired' ? (
+            <p className="rounded-xl border border-line px-4 py-3 text-sm text-mute">
+              Desk is locked. Leads are still in the database. They renew or move to Pro from billing, or you can grant a month below.
             </p>
           ) : null}
           {canSwitch ? (
             <div className="flex flex-wrap gap-2">
-              {current !== 'studio' && !(moneyIn && paidOrder?.plan === 'studio') ? (
+              {!onStudio ? (
                 <button
                   type="button"
-                  className="cursor-pointer rounded-full border border-gold/35 px-3 py-1.5 text-xs text-gold-soft disabled:opacity-50"
+                  className={clsx(
+                    'cursor-pointer rounded-full px-3 py-1.5 text-xs disabled:opacity-50',
+                    requested === 'studio' && !onStudio ? 'bg-gold text-ink' : 'border border-gold/35 text-gold-soft',
+                  )}
                   disabled={planBusy !== null}
                   onClick={() => void activate('studio')}
                 >
                   {planBusy === 'studio' ? 'Switching…' : requested === 'studio' ? 'Grant Studio without payment' : 'Switch to Studio'}
                 </button>
               ) : null}
-              {current !== 'studio_pro' && !(moneyIn && paidOrder?.plan === 'studio_pro') ? (
+              {!onPro ? (
                 <button
                   type="button"
                   className={clsx(
@@ -342,10 +358,12 @@ export function Admin() {
   useEffect(() => {
     if (!data || autoOpenedRequests || focus) return
     const unpaidAsk = data.tenants.some((t) => !t.deletedAt && !t.isAdmin && !t.isDemo && t.billing.requestedPlan && t.billing.lastPayment?.status !== 'paid')
-    const justPaid = data.tenants.some((t) => !t.deletedAt && !t.isAdmin && !t.isDemo && t.billing.lastPayment?.status === 'paid')
+    const justPaid = data.tenants.some((t) => !t.deletedAt && !t.isAdmin && !t.isDemo && t.billing.status === 'active' && t.billing.lastPayment?.status === 'paid')
+    const ended = data.tenants.some((t) => !t.deletedAt && !t.isAdmin && !t.isDemo && t.billing.status === 'expired')
     if (unpaidAsk) setFilter('request')
     else if (justPaid) setFilter('paying')
-    if (unpaidAsk || justPaid) setAutoOpenedRequests(true)
+    else if (ended) setFilter('expired')
+    if (unpaidAsk || justPaid || ended) setAutoOpenedRequests(true)
   }, [data, autoOpenedRequests, focus])
 
   useEffect(() => {
@@ -358,10 +376,11 @@ export function Admin() {
   const tenants = data?.tenants || []
   const live = tenants.filter((t) => !t.isAdmin && !t.isDemo && !t.deletedAt)
   const removed = tenants.filter((t) => !t.isAdmin && !t.isDemo && t.deletedAt)
-  const paying = live.filter((t) => t.billing.status === 'active' || paidLive(t))
-  const trial = live.filter((t) => t.billing.status === 'trialing' && !paidLive(t))
+  const paying = live.filter((t) => t.billing.status === 'active')
+  const trial = live.filter((t) => t.billing.status === 'trialing')
   const requests = live.filter((t) => Boolean(t.billing.requestedPlan) && !paidLive(t))
   const paidDesks = live.filter((t) => paidLive(t))
+  const expired = live.filter((t) => t.billing.status === 'expired')
   const events = live.reduce((s, t) => s + t.leads.length, 0)
   const joinNotices: AppNotice[] = live.map((t) => ({
     id: `hq-new:${t.email}`,
@@ -373,10 +392,21 @@ export function Admin() {
   }))
   const requestNotices: AppNotice[] = requests.map((t) => ({
     id: `hq-request:${t.email}:${t.billing.requestedPlan}`,
-    title: `${t.studio.name} asked for ${planName(t.billing.requestedPlan)}`,
+    title:
+      t.billing.requestedPlan === t.billing.plan
+        ? `${t.studio.name} asked to renew ${planName(t.billing.requestedPlan)}`
+        : `${t.studio.name} asked for ${planName(t.billing.requestedPlan)}`,
     body: `${t.email} · payment not received yet`,
     href: `/admin?studio=${encodeURIComponent(t.email)}`,
     at: t.billing.requestedAt || new Date().toISOString(),
+    sticky: true,
+  }))
+  const expiredNotices: AppNotice[] = expired.map((t) => ({
+    id: `hq-expired:${t.email}:${t.billing.periodEndsOn || t.billing.trialEndsOn || 'ended'}`,
+    title: `${t.studio.name} · ${planName(t.billing.plan)} month ended`,
+    body: `${t.email} · desk locked · they can renew or move to Pro`,
+    href: `/admin?studio=${encodeURIComponent(t.email)}`,
+    at: t.billing.periodEndsOn || t.createdAt,
     sticky: true,
   }))
   const paidNotices: AppNotice[] = paidDesks.map((t) => ({
@@ -413,6 +443,7 @@ export function Admin() {
       if (filter === 'live' && (t.isAdmin || t.isDemo || t.deletedAt)) return false
       if (filter === 'paying' && kind(t) !== 'paying') return false
       if (filter === 'trial' && kind(t) !== 'trial') return false
+      if (filter === 'expired' && kind(t) !== 'expired') return false
       if (filter === 'request' && (t.deletedAt || !t.billing.requestedPlan || paidLive(t))) return false
       if (filter === 'removed' && !t.deletedAt) return false
       if (!needle) return true
@@ -432,7 +463,7 @@ export function Admin() {
           </span>
         </div>
         <div className="flex items-center gap-3 text-sm">
-          <NoticeBell extras={[...paidNotices, ...joinNotices, ...requestNotices, ...leadNotices]} />
+          <NoticeBell extras={[...paidNotices, ...joinNotices, ...requestNotices, ...expiredNotices, ...leadNotices]} />
           <UserHello name={firstName(me)} />
           <Link to="/studio" className="text-gold-soft">
             My desk
@@ -455,7 +486,7 @@ export function Admin() {
           <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gold-soft">HQ</p>
           <h1 className="mt-1 font-display text-2xl sm:text-3xl">Every studio</h1>
           <p className="mt-1 max-w-2xl text-sm text-mute">
-            Paying and trial desks, Razorpay payments, the couples they booked, and a full records download.
+            Paying, trial and expired desks, Razorpay payments, the couples they booked, and a full records download.
             {removed.length ? ` ${removed.length} removed desk${removed.length === 1 ? '' : 's'} still sit in the database.` : ''}
           </p>
         </div>
@@ -468,6 +499,7 @@ export function Admin() {
               ['On trial', String(trial.length), 'trial' as Filter],
               ['Asked · unpaid', String(requests.length), 'request' as Filter],
               ['Paid', String(paidDesks.length), 'paying' as Filter],
+              ['Month ended', String(expired.length), 'expired' as Filter],
               ['Events on file', String(events), 'live' as Filter],
             ] as const
           ).map(([k, v, next]) => (
@@ -477,7 +509,9 @@ export function Admin() {
               onClick={() => setFilter(next)}
               className={clsx(
                 'rounded-2xl border bg-ink-2 p-4 text-left',
-                (k === 'Asked · unpaid' && requests.length > 0) || (k === 'Paid' && paidDesks.length > 0)
+                (k === 'Asked · unpaid' && requests.length > 0) ||
+                (k === 'Paid' && paidDesks.length > 0) ||
+                (k === 'Month ended' && expired.length > 0)
                   ? 'border-gold/50'
                   : 'border-line',
               )}
@@ -509,6 +543,7 @@ export function Admin() {
                 ['request', 'Asked · unpaid'],
                 ['paying', 'Paid / paying'],
                 ['trial', 'Trial'],
+                ['expired', 'Month ended'],
                 ['removed', 'Removed'],
                 ['records', 'Records'],
                 ['all', 'All including demo'],

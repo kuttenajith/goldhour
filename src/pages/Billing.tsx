@@ -1,11 +1,11 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { BrandMark } from '../components/BrandMark.tsx'
 import { Button } from '../components/Button.tsx'
 import { NoticeBell } from '../components/NoticeBell.tsx'
 import { DeskSession } from '../components/TabGuard.tsx'
 import { firstName } from '../lib/copilot.ts'
-import { api, acceptSession, useStudio } from '../lib/store.ts'
+import { api, acceptSession, logoutStudio, useStudio } from '../lib/store.ts'
 import { UserHello } from '../components/UserHello.tsx'
 import type { StudioSnapshot } from '../lib/types.ts'
 
@@ -41,11 +41,51 @@ const plans = [
   },
 ]
 
+function planTitle(id?: string | null) {
+  if (id === 'studio_pro') return 'Studio Pro'
+  if (id === 'studio') return 'Studio'
+  return 'Trial'
+}
+
+function headline(snap: StudioSnapshot) {
+  if (snap.billing.status === 'active') return `${planTitle(snap.billing.plan)} is on`
+  if (snap.billing.status === 'trialing') return 'Subscribe any time'
+  if (snap.billing.periodEndsOn) return 'Your month ended'
+  return 'Trial ended'
+}
+
+function blurb(snap: StudioSnapshot) {
+  if (snap.billing.status === 'active') {
+    return `${planTitle(snap.billing.plan)} runs until ${snap.billing.periodEndsOn}. Add another month or move to Pro. HQ sees the payment as soon as Razorpay completes — no approval wait.`
+  }
+  if (snap.billing.status === 'trialing') {
+    return `Trial is on until ${snap.billing.trialEndsOn}. Pay now if you want — you do not have to wait for the trial to end.`
+  }
+  if (snap.billing.periodEndsOn) {
+    return `${planTitle(snap.billing.plan)} ended on ${snap.billing.periodEndsOn}. Leads, quotes and couple payments stay saved. Renew Studio for another month, or move to Pro. HQ sees the request in the bell; the desk reopens the moment Razorpay completes.`
+  }
+  return `Trial ended on ${snap.billing.trialEndsOn}. Pay Studio or Pro to open the desk again.`
+}
+
+function cta(planId: string, snap: StudioSnapshot) {
+  const p = plans.find((x) => x.id === planId)
+  const name = p?.name || 'Studio'
+  const price = p?.price || ''
+  if (snap.billing.status === 'trialing') return `Start ${name} now`
+  if (snap.billing.status === 'active' && snap.billing.plan === planId) return `Add 1 month · ${price}`
+  if (snap.billing.status === 'expired' && snap.billing.plan === planId) return `Renew ${name} · ${price}`
+  if (planId === 'studio_pro' && snap.billing.plan === 'studio') return `Move to Pro · ${price}`
+  return `Pay ${name} · ${price}`
+}
+
 export function Billing() {
   const snap = useStudio()
+  const navigate = useNavigate()
   const [error, setError] = useState('')
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
+  const asked = snap.billing.requestedPlan
+  const renewAsk = asked && asked === snap.billing.plan && (asked === 'studio' || asked === 'studio_pro')
 
   async function pay(plan: string) {
     setError('')
@@ -67,7 +107,7 @@ export function Billing() {
         body: JSON.stringify({ plan }),
       })
       if (order.requested) {
-        setNote(order.message || 'HQ has your request. You can start a paid plan during the trial.')
+        setNote(order.message || 'HQ has your request. Pay when Razorpay is ready, or wait if they grant the plan.')
         return
       }
       if (!window.Razorpay || !order.keyId || !order.orderId || !order.amount) {
@@ -115,19 +155,13 @@ export function Billing() {
           </div>
         </div>
         <p className="mt-10 text-sm uppercase tracking-[0.12em] text-gold-soft">Billing</p>
-        <h1 className="mt-2 font-display text-5xl">Subscribe any time</h1>
-        <p className="mt-4 max-w-xl text-mute">
-          {snap.billing.active
-            ? snap.billing.status === 'active'
-              ? `Studio plan is active until ${snap.billing.periodEndsOn}.`
-              : `Trial is on until ${snap.billing.trialEndsOn}. Pay now if you want — you do not have to wait for the trial to end.`
-            : `Trial ended on ${snap.billing.trialEndsOn}. Pay to open the desk again.`}
-        </p>
+        <h1 className="mt-2 font-display text-5xl">{headline(snap)}</h1>
+        <p className="mt-4 max-w-xl text-mute">{blurb(snap)}</p>
         {error ? <p className="mt-4 text-sm text-orange-200">{error}</p> : null}
         {note ? <p className="mt-4 text-sm text-gold-soft">{note}</p> : null}
-        {snap.billing.requestedPlan ? (
+        {asked ? (
           <p className="mt-4 text-sm text-gold-soft">
-            HQ has your {snap.billing.requestedPlan === 'studio_pro' ? 'Studio Pro' : 'Studio'} request. Your desk updates when they approve it.
+            HQ has your {planTitle(asked)} {renewAsk ? 'renewal' : 'request'}. Pay below to open the desk now, or wait if they grant it without payment.
           </p>
         ) : null}
         <div className="mt-10 grid gap-4 md:grid-cols-2">
@@ -145,7 +179,7 @@ export function Billing() {
                 ))}
               </ul>
               <Button className="mt-6 w-full" disabled={busy !== null || snap.isDemo} onClick={() => void pay(p.id)}>
-                {busy === p.id ? 'Starting…' : snap.billing.status === 'trialing' ? `Start ${p.name} now` : `Pay ${p.price}`}
+                {busy === p.id ? 'Starting…' : cta(p.id, snap)}
               </Button>
             </article>
           ))}
@@ -159,10 +193,22 @@ export function Billing() {
             to subscribe.
           </p>
         ) : null}
-        <p className="mt-8">
-          <Link to={snap.billing.active ? '/studio' : '/login'} className="text-gold-soft">
-            {snap.billing.active ? 'Back to desk' : 'Back to sign in'}
-          </Link>
+        <p className="mt-8 flex flex-wrap gap-4">
+          {snap.billing.active ? (
+            <Link to="/studio" className="text-gold-soft">
+              Back to desk
+            </Link>
+          ) : (
+            <button
+              type="button"
+              className="text-gold-soft"
+              onClick={() => {
+                void logoutStudio().then(() => navigate('/login'))
+              }}
+            >
+              Sign out
+            </button>
+          )}
         </p>
       </div>
     </div>

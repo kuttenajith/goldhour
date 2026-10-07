@@ -217,7 +217,8 @@ export async function notifyPlanRequest(opts: {
   if (isAdminEmail(opts.email)) return
   const want = opts.plan === 'studio_pro' ? 'Studio Pro' : 'Studio'
   const href = `/admin?studio=${encodeURIComponent(opts.email)}`
-  const title = `${opts.studio.name} asked for ${want}`
+  const renew = opts.current === opts.plan && (opts.current === 'studio' || opts.current === 'studio_pro')
+  const title = renew ? `${opts.studio.name} asked to renew ${want}` : `${opts.studio.name} asked for ${want}`
   const body = `${opts.email} · payment not received yet · you can still grant ${want}`
   await pushHqNotice({
     id: hqPlanRequestId(opts.email, opts.plan),

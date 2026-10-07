@@ -367,9 +367,8 @@ function fileStore(path: string): Store {
         sub.status = 'active'
         sub.razorpayPaymentId = paymentId
         sub.requestedPlan = null
-        const start = sub.periodEndsOn && sub.periodEndsOn > new Date().toISOString().slice(0, 10)
-          ? sub.periodEndsOn
-          : new Date().toISOString().slice(0, 10)
+        const today = new Date().toISOString().slice(0, 10)
+        const start = sub.periodEndsOn && sub.periodEndsOn >= today ? sub.periodEndsOn : today
         const d = new Date(`${start}T00:00:00.000Z`)
         d.setUTCDate(d.getUTCDate() + 30)
         sub.periodEndsOn = d.toISOString().slice(0, 10)
@@ -708,7 +707,7 @@ function postgresStore(url: string): Store {
       const sub = await store.getSub(order.userId)
       if (!sub) return
       const today = new Date().toISOString().slice(0, 10)
-      const start = sub.periodEndsOn && sub.periodEndsOn > today ? sub.periodEndsOn : today
+      const start = sub.periodEndsOn && sub.periodEndsOn >= today ? sub.periodEndsOn : today
       const d = new Date(`${start}T00:00:00.000Z`)
       d.setUTCDate(d.getUTCDate() + 30)
       await store.upsertSub({

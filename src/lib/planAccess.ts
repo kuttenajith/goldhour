@@ -29,7 +29,7 @@ export function planLabel(snap: StudioSnapshot) {
     case 'studio':
       return 'Studio'
     default:
-      return 'Trial ended'
+      return 'Plan ended'
   }
 }
 

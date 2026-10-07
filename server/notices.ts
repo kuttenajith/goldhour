@@ -90,7 +90,11 @@ export function hqLeadNoticeId(email: string, leadId: string) {
   return `hq-lead:${email}:${leadId}`
 }
 
-function liveStudio(leads: Lead[], billing: { status: string; trialEndsOn: string }, pro: boolean): AppNotice[] {
+function liveStudio(
+  leads: Lead[],
+  billing: { status: string; trialEndsOn: string; periodEndsOn?: string | null; plan?: string },
+  pro: boolean,
+): AppNotice[] {
   const today = todayIso()
   const items: AppNotice[] = []
   if (!leads.length) {
@@ -209,6 +213,31 @@ function liveStudio(leads: Lead[], billing: { status: string; trialEndsOn: strin
       })
     }
   }
+  if (billing.status === 'active' && billing.periodEndsOn) {
+    const left = daysBetween(today, billing.periodEndsOn)
+    if (left >= 0 && left <= 5) {
+      const name = planTitle(billing.plan || 'studio')
+      items.push({
+        id: `period:${billing.periodEndsOn}`,
+        title: left === 0 ? `${name} ends today` : `${name} ends in ${left} day${left === 1 ? '' : 's'}`,
+        body: 'Renew this plan or move to Pro. Leads and quotes stay saved.',
+        href: '/studio/billing',
+        at: `${asDay(billing.periodEndsOn)}T00:00:00.000Z`,
+        sticky: true,
+      })
+    }
+  }
+  if (billing.status === 'expired') {
+    const ended = billing.periodEndsOn || billing.trialEndsOn
+    items.push({
+      id: `ended:${ended || 'now'}`,
+      title: billing.periodEndsOn ? 'Your month ended' : 'Trial ended',
+      body: 'Leads and quotes are saved. Renew Studio or move to Pro to open the desk.',
+      href: '/studio/billing',
+      at: `${asDay(ended || today)}T00:00:00.000Z`,
+      sticky: true,
+    })
+  }
   return items
 }
 
@@ -230,7 +259,7 @@ function fromAudit(
 
 export function studioNotices(opts: {
   leads: Lead[]
-  billing: { status: string; trialEndsOn: string }
+  billing: { status: string; trialEndsOn: string; periodEndsOn?: string | null; plan?: string }
   audit: AuditRow[]
   pro?: boolean
 }): AppNotice[] {
@@ -266,9 +295,10 @@ export function hqNotices(opts: { tenants: TenantPublic[]; audit: AuditRow[]; in
         audit: opts.audit,
       })
       if (pending) {
+        const renew = pending.plan === billing.plan && (billing.plan === 'studio' || billing.plan === 'studio_pro')
         live.push({
           id: hqPlanRequestId(email, pending.plan),
-          title: `${name} asked for ${planTitle(pending.plan)}`,
+          title: renew ? `${name} asked to renew ${planTitle(pending.plan)}` : `${name} asked for ${planTitle(pending.plan)}`,
           body: `${email} · open HQ and switch the desk`,
           href: hqHref(email),
           at: pending.at,
@@ -287,6 +317,29 @@ export function hqNotices(opts: { tenants: TenantPublic[]; audit: AuditRow[]; in
             sticky: true,
           })
         }
+      }
+      if (billing.status === 'active' && billing.periodEndsOn) {
+        const left = daysBetween(today, billing.periodEndsOn)
+        if (left >= 0 && left <= 5) {
+          live.push({
+            id: `hq-period:${email}:${billing.periodEndsOn}`,
+            title: `${name} · ${planTitle(billing.plan)} ending`,
+            body: left === 0 ? 'Ends today · they can renew from billing' : `${left} day${left === 1 ? '' : 's'} left · ${email}`,
+            href: hqHref(email),
+            at: `${asDay(billing.periodEndsOn)}T00:00:00.000Z`,
+            sticky: true,
+          })
+        }
+      }
+      if (billing.status === 'expired') {
+        live.push({
+          id: `hq-expired:${email}:${billing.periodEndsOn || billing.trialEndsOn || 'ended'}`,
+          title: `${name} · ${planTitle(billing.plan || 'studio')} month ended`,
+          body: `${email} · desk locked · they can renew or move to Pro`,
+          href: hqHref(email),
+          at: `${asDay(billing.periodEndsOn || billing.trialEndsOn || today)}T00:00:00.000Z`,
+          sticky: true,
+        })
       }
       live.push({
         id: `hq-new:${email}`,

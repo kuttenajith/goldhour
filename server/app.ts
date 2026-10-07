@@ -779,7 +779,7 @@ app.post('/billing/checkout', async (c) => {
         tagline: actor.studio.tagline,
       },
       plan: plan.id,
-      current: sub ? billingStatus(sub).plan : 'trial',
+      current: sub?.plan || 'trial',
     })
   } catch (err) {
     console.error('goldhour-notify-request', err)
@@ -955,6 +955,7 @@ app.get('/notices', async (c) => {
   const billing = {
     status: sub ? billingStatus(sub).status : actor.user.email === DEMO_EMAIL ? 'active' : 'trialing',
     trialEndsOn: sub?.trialEndsOn || '',
+    periodEndsOn: sub?.periodEndsOn || null,
     plan: sub ? billingStatus(sub).plan : 'trial',
   }
   const pro =
