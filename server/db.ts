@@ -18,6 +18,7 @@ export type UserRow = {
   createdAt: string
   emailVerifiedAt: string | null
   role: UserRole
+  deletedAt: string | null
 }
 
 export type SessionRow = {
@@ -80,6 +81,8 @@ export type OrderRow = {
   amount: number
   status: string
   createdAt: string
+  paidAt: string | null
+  razorpayPaymentId: string | null
 }
 
 export type PhoneOtpRow = {
@@ -92,7 +95,7 @@ export type PhoneOtpRow = {
 }
 
 export type TenantPublic = {
-  user: { id: string; email: string; createdAt: string }
+  user: { id: string; email: string; createdAt: string; deletedAt: string | null }
   studio: StudioRow | null
   sub: SubRow | null
 }
@@ -108,7 +111,9 @@ export type Store = {
   upsertSub(sub: SubRow): Promise<void>
   insertOrder(order: OrderRow): Promise<void>
   findOrderByRazorpayId(id: string): Promise<OrderRow | null>
+  listOrders(): Promise<OrderRow[]>
   markOrderPaid(razorpayOrderId: string, paymentId: string): Promise<void>
+  setUserDeleted(userId: string, deletedAt: string | null): Promise<void>
   ensureDemo(): Promise<UserRow>
   listTenants(): Promise<TenantPublic[]>
   updatePassword(userId: string, passwordHash: string): Promise<void>
@@ -133,9 +138,10 @@ export type Store = {
   listHqNotices(): Promise<AppNotice[]>
 }
 
-function mapUser(row: Partial<UserRow> & { id: string; email: string; passwordHash?: string; password_hash?: string; createdAt?: string; created_at?: string; emailVerifiedAt?: string | null; email_verified_at?: string | null; role?: string }): UserRow {
+function mapUser(row: Partial<UserRow> & { id: string; email: string; passwordHash?: string; password_hash?: string; createdAt?: string; created_at?: string; emailVerifiedAt?: string | null; email_verified_at?: string | null; deletedAt?: string | null; deleted_at?: string | null; role?: string }): UserRow {
   const email = String(row.email).toLowerCase()
   const verified = row.emailVerifiedAt ?? row.email_verified_at ?? null
+  const deleted = row.deletedAt ?? row.deleted_at ?? null
   return {
     id: row.id,
     email,
@@ -143,6 +149,7 @@ function mapUser(row: Partial<UserRow> & { id: string; email: string; passwordHa
     createdAt: toIso(row.createdAt || row.created_at, new Date().toISOString()),
     emailVerifiedAt: verified ? toIso(verified) || null : null,
     role: row.role === 'hq' || email === ADMIN_EMAIL ? 'hq' : 'owner',
+    deletedAt: deleted ? toIso(deleted) || null : null,
   }
 }
 
@@ -151,6 +158,22 @@ function publicUser(user: UserRow): TenantPublic['user'] {
     id: user.id,
     email: user.email,
     createdAt: toIso(user.createdAt, new Date().toISOString()),
+    deletedAt: user.deletedAt ? toIso(user.deletedAt) || null : null,
+  }
+}
+
+function mapOrder(row: Partial<OrderRow> & { id: string }): OrderRow {
+  const status = String(row.status || 'created')
+  return {
+    id: row.id,
+    userId: String(row.userId || ''),
+    razorpayOrderId: String(row.razorpayOrderId || ''),
+    plan: String(row.plan || ''),
+    amount: Number(row.amount || 0),
+    status,
+    createdAt: toIso(row.createdAt, new Date().toISOString()),
+    paidAt: row.paidAt ? toIso(row.paidAt) || null : status === 'paid' ? toIso(row.createdAt) || null : null,
+    razorpayPaymentId: row.razorpayPaymentId || null,
   }
 }
 
@@ -205,6 +228,7 @@ async function seedDemo(store: Store) {
     createdAt: new Date().toISOString(),
     emailVerifiedAt: new Date().toISOString(),
     role: 'owner',
+    deletedAt: null,
   }
   await store.insertUser(user)
   await store.upsertStudio({
@@ -322,13 +346,21 @@ function fileStore(path: string): Store {
       write(db)
     },
     async findOrderByRazorpayId(id) {
-      return read().orders.find((o) => o.razorpayOrderId === id) ?? null
+      const row = read().orders.find((o) => o.razorpayOrderId === id)
+      return row ? mapOrder(row) : null
+    },
+    async listOrders() {
+      return read()
+        .orders.map(mapOrder)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     },
     async markOrderPaid(razorpayOrderId, paymentId) {
       const db = read()
       const order = db.orders.find((o) => o.razorpayOrderId === razorpayOrderId)
       if (!order) return
       order.status = 'paid'
+      order.paidAt = new Date().toISOString()
+      order.razorpayPaymentId = paymentId
       const sub = db.subs.find((s) => s.userId === order.userId)
       if (sub) {
         sub.plan = order.plan
@@ -342,6 +374,13 @@ function fileStore(path: string): Store {
         d.setUTCDate(d.getUTCDate() + 30)
         sub.periodEndsOn = d.toISOString().slice(0, 10)
       }
+      write(db)
+    },
+    async setUserDeleted(userId, deletedAt) {
+      const db = read()
+      const user = db.users.find((u) => u.id === userId)
+      if (!user) return
+      user.deletedAt = deletedAt
       write(db)
     },
     async ensureDemo() {
@@ -501,6 +540,7 @@ function postgresStore(url: string): Store {
       )`
       await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified_at timestamptz`
       await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS role text NOT NULL DEFAULT 'owner'`
+      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at timestamptz`
       await sql`UPDATE users SET email_verified_at = COALESCE(email_verified_at, created_at)`
       await sql`UPDATE users SET role = 'hq' WHERE lower(email) = ${ADMIN_EMAIL}`
       await sql`CREATE TABLE IF NOT EXISTS studios (
@@ -534,6 +574,8 @@ function postgresStore(url: string): Store {
         status text NOT NULL,
         created_at timestamptz NOT NULL DEFAULT now()
       )`
+      await sql`ALTER TABLE billing_orders ADD COLUMN IF NOT EXISTS paid_at timestamptz`
+      await sql`ALTER TABLE billing_orders ADD COLUMN IF NOT EXISTS razorpay_payment_id text`
       await sql`CREATE TABLE IF NOT EXISTS sessions (
         id text PRIMARY KEY,
         user_id text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -594,18 +636,18 @@ function postgresStore(url: string): Store {
     },
     async findUserByEmail(email) {
       const needle = email.trim().toLowerCase()
-      const rows = await sql`SELECT id, email, password_hash AS "passwordHash", created_at AS "createdAt", email_verified_at AS "emailVerifiedAt", role FROM users WHERE lower(email) = ${needle}`
+      const rows = await sql`SELECT id, email, password_hash AS "passwordHash", created_at AS "createdAt", email_verified_at AS "emailVerifiedAt", role, deleted_at AS "deletedAt" FROM users WHERE lower(email) = ${needle}`
       const row = rows[0] as Parameters<typeof mapUser>[0] | undefined
       return row ? mapUser(row) : null
     },
     async findUserById(id) {
-      const rows = await sql`SELECT id, email, password_hash AS "passwordHash", created_at AS "createdAt", email_verified_at AS "emailVerifiedAt", role FROM users WHERE id = ${id}`
+      const rows = await sql`SELECT id, email, password_hash AS "passwordHash", created_at AS "createdAt", email_verified_at AS "emailVerifiedAt", role, deleted_at AS "deletedAt" FROM users WHERE id = ${id}`
       const row = rows[0] as Parameters<typeof mapUser>[0] | undefined
       return row ? mapUser(row) : null
     },
     async insertUser(user) {
       try {
-        await sql`INSERT INTO users (id, email, password_hash, created_at, email_verified_at, role) VALUES (${user.id}, ${user.email}, ${user.passwordHash}, ${user.createdAt}, ${user.emailVerifiedAt}, ${user.role})`
+        await sql`INSERT INTO users (id, email, password_hash, created_at, email_verified_at, role, deleted_at) VALUES (${user.id}, ${user.email}, ${user.passwordHash}, ${user.createdAt}, ${user.emailVerifiedAt}, ${user.role}, ${user.deletedAt})`
       } catch (err) {
         const message = err instanceof Error ? err.message : ''
         if (message.includes('unique') || message.includes('duplicate')) throw new Error('EMAIL_TAKEN')
@@ -647,17 +689,22 @@ function postgresStore(url: string): Store {
           requested_plan = excluded.requested_plan`
     },
     async insertOrder(order) {
-      await sql`INSERT INTO billing_orders (id, user_id, razorpay_order_id, plan, amount, status, created_at)
-        VALUES (${order.id}, ${order.userId}, ${order.razorpayOrderId}, ${order.plan}, ${order.amount}, ${order.status}, ${order.createdAt})`
+      await sql`INSERT INTO billing_orders (id, user_id, razorpay_order_id, plan, amount, status, created_at, paid_at, razorpay_payment_id)
+        VALUES (${order.id}, ${order.userId}, ${order.razorpayOrderId}, ${order.plan}, ${order.amount}, ${order.status}, ${order.createdAt}, ${order.paidAt}, ${order.razorpayPaymentId})`
     },
     async findOrderByRazorpayId(id) {
-      const rows = await sql`SELECT id, user_id AS "userId", razorpay_order_id AS "razorpayOrderId", plan, amount, status, created_at AS "createdAt" FROM billing_orders WHERE razorpay_order_id = ${id}`
-      return (rows[0] as OrderRow) ?? null
+      const rows = await sql`SELECT id, user_id AS "userId", razorpay_order_id AS "razorpayOrderId", plan, amount, status, created_at AS "createdAt", paid_at AS "paidAt", razorpay_payment_id AS "razorpayPaymentId" FROM billing_orders WHERE razorpay_order_id = ${id}`
+      const row = rows[0] as OrderRow | undefined
+      return row ? mapOrder(row) : null
+    },
+    async listOrders() {
+      const rows = await sql`SELECT id, user_id AS "userId", razorpay_order_id AS "razorpayOrderId", plan, amount, status, created_at AS "createdAt", paid_at AS "paidAt", razorpay_payment_id AS "razorpayPaymentId" FROM billing_orders ORDER BY created_at DESC`
+      return (rows as OrderRow[]).map(mapOrder)
     },
     async markOrderPaid(razorpayOrderId, paymentId) {
       const order = await store.findOrderByRazorpayId(razorpayOrderId)
       if (!order) return
-      await sql`UPDATE billing_orders SET status = 'paid' WHERE razorpay_order_id = ${razorpayOrderId}`
+      await sql`UPDATE billing_orders SET status = 'paid', paid_at = now(), razorpay_payment_id = ${paymentId} WHERE razorpay_order_id = ${razorpayOrderId}`
       const sub = await store.getSub(order.userId)
       if (!sub) return
       const today = new Date().toISOString().slice(0, 10)
@@ -673,11 +720,14 @@ function postgresStore(url: string): Store {
         periodEndsOn: d.toISOString().slice(0, 10),
       })
     },
+    async setUserDeleted(userId, deletedAt) {
+      await sql`UPDATE users SET deleted_at = ${deletedAt} WHERE id = ${userId}`
+    },
     async ensureDemo() {
       return seedDemo(store)
     },
     async listTenants() {
-      const users = await sql`SELECT id, email, created_at AS "createdAt" FROM users ORDER BY created_at DESC`
+      const users = await sql`SELECT id, email, created_at AS "createdAt", deleted_at AS "deletedAt" FROM users ORDER BY created_at DESC`
       const studios = await sql`SELECT id, user_id AS "userId", name, owner, city, phone, tagline, onboarded, leads, quotations FROM studios`
       const subs = await sql`SELECT user_id AS "userId", plan, status, trial_ends_on::text AS "trialEndsOn", period_ends_on::text AS "periodEndsOn", razorpay_payment_id AS "razorpayPaymentId", requested_plan AS "requestedPlan" FROM subscriptions`
       const studioByUser = new Map((studios as StudioRow[]).map((s) => [s.userId, s]))

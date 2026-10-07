@@ -144,7 +144,7 @@ async function actorFrom(c: Context) {
     const db = getStore()
     const user = await db.findUserById(payload.sub)
     const studio = await db.getStudio(payload.sub)
-    if (!user || !studio) return null
+    if (!user || !studio || user.deletedAt) return null
     return { user, studio, sessionId: payload.sid || '', demo: Boolean(payload.demo) }
   } catch {
     return null
@@ -197,6 +197,7 @@ async function claimAdmin(password: string) {
     createdAt: new Date().toISOString(),
     emailVerifiedAt: new Date().toISOString(),
     role: 'hq',
+    deletedAt: null,
   }
   await db.insertUser(user)
   await db.upsertStudio({
@@ -388,6 +389,7 @@ app.post('/auth/register', async (c) => {
     createdAt: new Date().toISOString(),
     emailVerifiedAt: admin ? new Date().toISOString() : null,
     role: admin ? 'hq' : 'owner',
+    deletedAt: null,
   }
   try {
     await db.insertUser(user)
@@ -493,6 +495,10 @@ app.post('/auth/login', async (c) => {
     await db.recordAuthAttempt(email || 'unknown', ip, false)
     await audit({ action: 'login.fail', userId: user?.id, ip })
     return c.json({ error: 'Email or password is wrong.' }, 401)
+  }
+  if (user.deletedAt) {
+    await audit({ action: 'login.removed', userId: user.id, ip })
+    return c.json({ error: 'This studio desk was removed. Contact GoldHour HQ.' }, 403)
   }
   await db.recordAuthAttempt(email, ip, true)
   await setSession(c, user.id, email === DEMO_EMAIL)
@@ -830,6 +836,8 @@ app.post('/billing/checkout', async (c) => {
     amount: plan.amountPaise,
     status: 'created',
     createdAt: new Date().toISOString(),
+    paidAt: null,
+    razorpayPaymentId: null,
   })
   await audit({ action: 'billing.checkout', userId: actor.user.id, studioId: actor.studio.id, detail: plan.id, ip: clientIp(c) })
   await notifyCheckout(
@@ -878,7 +886,7 @@ app.post('/billing/confirm', async (c) => {
     return c.json({ error: 'Order not found.' }, 404)
   }
   await getStore().markOrderPaid(orderId, paymentId)
-  await notifyPaid(actor.studio, actor.user.email, order.plan, order.amount)
+  await notifyPaid(actor.studio, actor.user.email, order.plan, order.amount, paymentId)
   await audit({
     action: 'billing.paid',
     userId: actor.user.id,
@@ -913,7 +921,7 @@ app.post('/billing/webhook', async (c) => {
       const user = await getStore().findUserById(order.userId)
       const studio = await getStore().getStudio(order.userId)
       if (user && studio) {
-        await notifyPaid(studio, user.email, order.plan, order.amount)
+        await notifyPaid(studio, user.email, order.plan, order.amount, paymentId)
         await audit({ action: 'billing.paid', userId: user.id, studioId: studio.id, detail: `webhook:${order.plan}` })
       }
     }
@@ -969,8 +977,12 @@ app.get('/admin/overview', async (c) => {
     return c.json({ error: "You don't have permission to perform this action." }, 403)
   }
   const db = getStore()
-  const [tenants, auditRows] = await Promise.all([db.listTenants(), billingAwareAudit()])
+  const [tenants, auditRows, orders] = await Promise.all([db.listTenants(), billingAwareAudit(), db.listOrders()])
   await audit({ action: 'admin.overview', userId: actor.user.id, ip: clientIp(c) })
+  const latestOrder = new Map<string, (typeof orders)[number]>()
+  for (const order of orders) {
+    if (!latestOrder.has(order.userId)) latestOrder.set(order.userId, order)
+  }
   const mapped = tenants.map((row) => {
     const profile = {
       name: row.studio?.name || 'Untitled studio',
@@ -995,11 +1007,13 @@ app.get('/admin/overview', async (c) => {
           stored: row.sub?.requestedPlan,
           audit: auditRows,
         })
+    const order = latestOrder.get(row.user.id)
     return {
       row,
       tenant: {
         email: row.user.email,
         createdAt: row.user.createdAt,
+        deletedAt: row.user.deletedAt || null,
         isDemo: row.user.email === DEMO_EMAIL,
         isAdmin: admin,
         studio: profile,
@@ -1013,6 +1027,17 @@ app.get('/admin/overview', async (c) => {
           active: admin || billing.active,
           requestedPlan: pending?.plan || null,
           requestedAt: pending?.at || null,
+          lastPayment: order
+            ? {
+                plan: order.plan,
+                amountPaise: order.amount,
+                status: order.status,
+                at: order.createdAt,
+                paidAt: order.paidAt,
+                razorpayOrderId: order.razorpayOrderId,
+                razorpayPaymentId: order.razorpayPaymentId,
+              }
+            : null,
         },
       },
     }
@@ -1084,6 +1109,124 @@ app.post('/admin/activate-plan', async (c) => {
     ip: clientIp(c),
   })
   return c.json({ ok: true })
+})
+
+app.post('/admin/remove-desk', async (c) => {
+  const actor = await actorFrom(c)
+  if (!actor) return c.json({ error: 'Sign in required' }, 401)
+  if (!isAdminEmail(actor.user.email) && actor.user.role !== 'hq') {
+    return c.json({ error: "You don't have permission to perform this action." }, 403)
+  }
+  const body = await readJson<{ email?: string }>(c)
+  const email = (body.email || '').trim().toLowerCase()
+  const db = getStore()
+  const user = await db.findUserByEmail(email)
+  if (!user) return c.json({ error: 'Studio not found.' }, 404)
+  if (isAdminEmail(user.email) || user.email === DEMO_EMAIL) {
+    return c.json({ error: 'HQ and the demo desk cannot be removed.' }, 400)
+  }
+  if (user.deletedAt) return c.json({ ok: true, already: true })
+  await db.setUserDeleted(user.id, new Date().toISOString())
+  await db.revokeUserSessions(user.id)
+  const studio = await db.getStudio(user.id)
+  await audit({
+    action: 'desk.remove',
+    userId: actor.user.id,
+    studioId: studio?.id,
+    detail: email,
+    ip: clientIp(c),
+  })
+  return c.json({ ok: true })
+})
+
+app.post('/admin/restore-desk', async (c) => {
+  const actor = await actorFrom(c)
+  if (!actor) return c.json({ error: 'Sign in required' }, 401)
+  if (!isAdminEmail(actor.user.email) && actor.user.role !== 'hq') {
+    return c.json({ error: "You don't have permission to perform this action." }, 403)
+  }
+  const body = await readJson<{ email?: string }>(c)
+  const email = (body.email || '').trim().toLowerCase()
+  const db = getStore()
+  const user = await db.findUserByEmail(email)
+  if (!user) return c.json({ error: 'Studio not found.' }, 404)
+  await db.setUserDeleted(user.id, null)
+  const studio = await db.getStudio(user.id)
+  await audit({
+    action: 'desk.restore',
+    userId: actor.user.id,
+    studioId: studio?.id,
+    detail: email,
+    ip: clientIp(c),
+  })
+  return c.json({ ok: true })
+})
+
+app.get('/admin/export', async (c) => {
+  const actor = await actorFrom(c)
+  if (!actor) return c.json({ error: 'Sign in required' }, 401)
+  if (!isAdminEmail(actor.user.email) && actor.user.role !== 'hq') {
+    return c.json({ error: "You don't have permission to perform this action." }, 403)
+  }
+  const db = getStore()
+  const [tenants, orders, auditRows] = await Promise.all([
+    db.listTenants(),
+    db.listOrders(),
+    db.listAudit({ limit: 400 }),
+  ])
+  const desks = tenants
+    .filter((t) => !isAdminEmail(t.user.email))
+    .map((t) => {
+      const billing = t.sub ? billingStatus(t.sub) : null
+      const leads = Array.isArray(t.studio?.leads) ? t.studio.leads : []
+      const quotations = Array.isArray(t.studio?.quotations) ? t.studio.quotations : []
+      return {
+        email: t.user.email,
+        joinedAt: t.user.createdAt,
+        removedAt: t.user.deletedAt,
+        studio: t.studio
+          ? {
+              name: t.studio.name,
+              owner: t.studio.owner,
+              city: t.studio.city,
+              phone: t.studio.phone,
+              tagline: t.studio.tagline,
+              onboarded: t.studio.onboarded,
+            }
+          : null,
+        plan: billing?.plan || t.sub?.plan || 'trial',
+        status: billing?.status || t.sub?.status || '',
+        trialEndsOn: t.sub?.trialEndsOn || '',
+        periodEndsOn: t.sub?.periodEndsOn || null,
+        requestedPlan: t.sub?.requestedPlan || null,
+        razorpayPaymentId: t.sub?.razorpayPaymentId || null,
+        leads,
+        quotations,
+      }
+    })
+  await audit({ action: 'admin.export', userId: actor.user.id, ip: clientIp(c) })
+  return c.json({
+    exportedAt: new Date().toISOString(),
+    desks,
+    payments: orders.map((order) => ({
+      userId: order.userId,
+      plan: order.plan,
+      amountPaise: order.amount,
+      amountRupees: Math.round(order.amount / 100),
+      status: order.status,
+      createdAt: order.createdAt,
+      paidAt: order.paidAt,
+      razorpayOrderId: order.razorpayOrderId,
+      razorpayPaymentId: order.razorpayPaymentId,
+    })),
+    activity: auditRows.map((row) => ({
+      at: row.createdAt,
+      action: row.action,
+      detail: row.detail,
+      userId: row.userId,
+      studioId: row.studioId,
+    })),
+  })
 })
 
 export default app

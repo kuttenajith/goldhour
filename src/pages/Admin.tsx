@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { LogOut, Shield } from 'lucide-react'
+import { Download, LogOut, Shield } from 'lucide-react'
 import { BrandMark } from '../components/BrandMark.tsx'
 import { NoticeBell } from '../components/NoticeBell.tsx'
 import { DeskSession } from '../components/TabGuard.tsx'
@@ -9,12 +9,13 @@ import { StatusPill } from '../components/StatusPill.tsx'
 import { fieldClass } from '../components/Field.tsx'
 import { day, money, paid, when, PAYMENT_LABEL, SERVICE_LABEL, SOURCE_LABEL } from '../lib/format.ts'
 import { firstName } from '../lib/copilot.ts'
+import { desksCsv, downloadText, leadsCsv, paymentsCsv, type HqExport } from '../lib/hqExport.ts'
 import { api, logoutStudio, useStudio } from '../lib/store.ts'
 import { UserHello } from '../components/UserHello.tsx'
 import type { AdminOverview, AdminTenant, AppNotice, Lead } from '../lib/types.ts'
 import { clsx } from '../lib/clsx.ts'
 
-type Filter = 'live' | 'paying' | 'trial' | 'request' | 'all'
+type Filter = 'live' | 'paying' | 'trial' | 'request' | 'removed' | 'records' | 'all'
 
 function planName(id?: string | null) {
   if (id === 'studio_pro') return 'Studio Pro'
@@ -24,11 +25,16 @@ function planName(id?: string | null) {
 }
 
 function kind(t: AdminTenant): Filter | 'hq' | 'demo' {
+  if (t.deletedAt) return 'removed'
   if (t.isAdmin) return 'hq'
   if (t.isDemo) return 'demo'
   if (t.billing.status === 'active') return 'paying'
   if (t.billing.status === 'trialing') return 'trial'
   return 'all'
+}
+
+function paidLive(t: AdminTenant) {
+  return t.billing.lastPayment?.status === 'paid'
 }
 
 function LeadBlock({ lead }: { lead: Lead }) {
@@ -93,15 +99,29 @@ function StudioCard({
   startsOpen?: boolean
   onRefresh?: () => void
 }) {
-  const [open, setOpen] = useState(Boolean(startsOpen) || Boolean(tenant.billing.requestedPlan))
+  const paidOrder = tenant.billing.lastPayment
+  const moneyIn = paidOrder?.status === 'paid'
+  const [open, setOpen] = useState(Boolean(startsOpen) || Boolean(tenant.billing.requestedPlan) || moneyIn)
   const [planBusy, setPlanBusy] = useState<string | null>(null)
+  const [deskBusy, setDeskBusy] = useState(false)
   useEffect(() => {
-    if (startsOpen || tenant.billing.requestedPlan) setOpen(true)
-  }, [startsOpen, tenant.billing.requestedPlan])
+    if (startsOpen || tenant.billing.requestedPlan || moneyIn) setOpen(true)
+  }, [startsOpen, tenant.billing.requestedPlan, moneyIn])
   const booked = tenant.leads.filter((l) => l.status === 'booked' || l.status === 'accepted')
   const collected = tenant.leads.reduce((s, l) => s + paid(l), 0)
-  const label = tenant.isAdmin ? 'HQ' : tenant.isDemo ? 'Demo' : tenant.billing.status === 'active' ? 'Paying' : tenant.billing.status === 'trialing' ? 'Trial' : 'Expired'
-  const canSwitch = !tenant.isAdmin && !tenant.isDemo
+  const removed = Boolean(tenant.deletedAt)
+  const label = tenant.isAdmin
+    ? 'HQ'
+    : tenant.isDemo
+      ? 'Demo'
+      : removed
+        ? 'Removed'
+        : moneyIn || tenant.billing.status === 'active'
+          ? 'Paying'
+          : tenant.billing.status === 'trialing'
+            ? 'Trial'
+            : 'Expired'
+  const canSwitch = !tenant.isAdmin && !tenant.isDemo && !removed
   const current = tenant.billing.status === 'active' ? tenant.billing.plan : tenant.billing.status === 'trialing' ? 'trial' : tenant.billing.plan
   const requested = tenant.billing.requestedPlan
 
@@ -112,6 +132,27 @@ function StudioCard({
       onRefresh?.()
     } finally {
       setPlanBusy(null)
+    }
+  }
+
+  async function removeDesk() {
+    if (!window.confirm(`Remove ${tenant.studio.name}? The desk stays in the database. They cannot sign in.`)) return
+    setDeskBusy(true)
+    try {
+      await api('/api/admin/remove-desk', { method: 'POST', body: JSON.stringify({ email: tenant.email }) })
+      onRefresh?.()
+    } finally {
+      setDeskBusy(false)
+    }
+  }
+
+  async function restoreDesk() {
+    setDeskBusy(true)
+    try {
+      await api('/api/admin/restore-desk', { method: 'POST', body: JSON.stringify({ email: tenant.email }) })
+      onRefresh?.()
+    } finally {
+      setDeskBusy(false)
     }
   }
   return (
@@ -125,9 +166,13 @@ function StudioCard({
           </span>
         </span>
         <span className="flex flex-wrap items-center gap-3 text-sm">
-          {requested ? (
+          {moneyIn ? (
             <span className="rounded-full bg-gold px-3 py-1 text-xs uppercase tracking-wider text-ink">
-              Wants {planName(requested)}
+              Paid {planName(paidOrder?.plan)}
+            </span>
+          ) : requested ? (
+            <span className="rounded-full border border-gold/50 px-3 py-1 text-xs uppercase tracking-wider text-gold-soft">
+              Asked {planName(requested)} · unpaid
             </span>
           ) : null}
           <span className="rounded-full border border-gold/35 px-3 py-1 text-xs uppercase tracking-wider text-gold-soft">{label}</span>
@@ -161,36 +206,68 @@ function StudioCard({
               </div>
             ) : null}
           </dl>
-          {requested ? (
+          {moneyIn ? (
             <p className="rounded-xl border border-gold/40 bg-gold/10 px-4 py-3 text-sm text-gold-soft">
-              {tenant.email} asked to switch to {planName(requested)}. Approve below.
+              Payment complete: {planName(paidOrder?.plan)} · {money(Math.round((paidOrder?.amountPaise || 0) / 100))}
+              {paidOrder?.paidAt ? ` · ${when(paidOrder.paidAt)}` : ''}. The desk is live
+              {tenant.billing.status === 'active' ? ` until ${day(tenant.billing.periodEndsOn || '')}` : ''}. No approval needed.
+              {paidOrder?.razorpayPaymentId ? (
+                <span className="mt-1 block text-xs text-mute">Razorpay {paidOrder.razorpayPaymentId}</span>
+              ) : null}
+            </p>
+          ) : requested ? (
+            <p className="rounded-xl border border-gold/40 bg-gold/10 px-4 py-3 text-sm text-gold-soft">
+              {tenant.email} asked for {planName(requested)}. Razorpay has not recorded a payment yet. Approve below only if you want to grant the plan without waiting.
             </p>
           ) : null}
           {canSwitch ? (
             <div className="flex flex-wrap gap-2">
-              {current !== 'studio' ? (
+              {current !== 'studio' && !(moneyIn && paidOrder?.plan === 'studio') ? (
                 <button
                   type="button"
                   className="cursor-pointer rounded-full border border-gold/35 px-3 py-1.5 text-xs text-gold-soft disabled:opacity-50"
                   disabled={planBusy !== null}
                   onClick={() => void activate('studio')}
                 >
-                  {planBusy === 'studio' ? 'Switching…' : requested === 'studio' ? 'Approve Studio' : 'Switch to Studio'}
+                  {planBusy === 'studio' ? 'Switching…' : requested === 'studio' ? 'Grant Studio without payment' : 'Switch to Studio'}
                 </button>
               ) : null}
-              {current !== 'studio_pro' ? (
+              {current !== 'studio_pro' && !(moneyIn && paidOrder?.plan === 'studio_pro') ? (
                 <button
                   type="button"
                   className={clsx(
                     'cursor-pointer rounded-full px-3 py-1.5 text-xs disabled:opacity-50',
-                    requested === 'studio_pro' ? 'bg-gold text-ink' : 'border border-gold/35 text-gold-soft',
+                    requested === 'studio_pro' && !moneyIn ? 'bg-gold text-ink' : 'border border-gold/35 text-gold-soft',
                   )}
                   disabled={planBusy !== null}
                   onClick={() => void activate('studio_pro')}
                 >
-                  {planBusy === 'studio_pro' ? 'Switching…' : requested === 'studio_pro' ? 'Approve Pro' : 'Switch to Pro'}
+                  {planBusy === 'studio_pro' ? 'Switching…' : requested === 'studio_pro' ? 'Grant Pro without payment' : 'Switch to Pro'}
                 </button>
               ) : null}
+            </div>
+          ) : null}
+          {canSwitch ? (
+            <button
+              type="button"
+              className="cursor-pointer text-xs text-mute hover:text-orange-200 disabled:opacity-50"
+              disabled={deskBusy}
+              onClick={() => void removeDesk()}
+            >
+              {deskBusy ? 'Removing…' : 'Remove this studio desk'}
+            </button>
+          ) : null}
+          {removed && !tenant.isAdmin && !tenant.isDemo ? (
+            <div className="flex flex-wrap items-center gap-3">
+              <p className="text-sm text-orange-200">Removed {when(tenant.deletedAt || '')}. Data is still in the database.</p>
+              <button
+                type="button"
+                className="cursor-pointer rounded-full border border-gold/35 px-3 py-1.5 text-xs text-gold-soft disabled:opacity-50"
+                disabled={deskBusy}
+                onClick={() => void restoreDesk()}
+              >
+                {deskBusy ? 'Restoring…' : 'Put desk back'}
+              </button>
             </div>
           ) : null}
           <p className="text-xs uppercase tracking-[0.2em] text-mute">
@@ -227,6 +304,9 @@ export function Admin() {
   const [q, setQ] = useState('')
   const [filter, setFilter] = useState<Filter>('live')
   const [autoOpenedRequests, setAutoOpenedRequests] = useState(false)
+  const [pack, setPack] = useState<HqExport | null>(null)
+  const [packError, setPackError] = useState('')
+  const [packBusy, setPackBusy] = useState(false)
 
   function loadHq() {
     api<AdminOverview>('/api/admin/overview')
@@ -234,9 +314,26 @@ export function Admin() {
       .catch((err) => setError(err instanceof Error ? err.message : 'Could not load HQ'))
   }
 
+  async function loadRecords() {
+    setPackBusy(true)
+    setPackError('')
+    try {
+      const next = await api<HqExport>('/api/admin/export')
+      setPack(next)
+    } catch (err) {
+      setPackError(err instanceof Error ? err.message : 'Could not load records')
+    } finally {
+      setPackBusy(false)
+    }
+  }
+
   useEffect(() => {
     loadHq()
   }, [])
+
+  useEffect(() => {
+    if (filter === 'records') void loadRecords()
+  }, [filter])
 
   useEffect(() => {
     if (focus) setFilter('all')
@@ -244,10 +341,11 @@ export function Admin() {
 
   useEffect(() => {
     if (!data || autoOpenedRequests || focus) return
-    if (data.tenants.some((t) => t.billing.requestedPlan && !t.isAdmin && !t.isDemo)) {
-      setFilter('request')
-      setAutoOpenedRequests(true)
-    }
+    const unpaidAsk = data.tenants.some((t) => !t.deletedAt && !t.isAdmin && !t.isDemo && t.billing.requestedPlan && t.billing.lastPayment?.status !== 'paid')
+    const justPaid = data.tenants.some((t) => !t.deletedAt && !t.isAdmin && !t.isDemo && t.billing.lastPayment?.status === 'paid')
+    if (unpaidAsk) setFilter('request')
+    else if (justPaid) setFilter('paying')
+    if (unpaidAsk || justPaid) setAutoOpenedRequests(true)
   }, [data, autoOpenedRequests, focus])
 
   useEffect(() => {
@@ -258,10 +356,12 @@ export function Admin() {
   }, [focus, data])
 
   const tenants = data?.tenants || []
-  const live = tenants.filter((t) => !t.isAdmin && !t.isDemo)
-  const paying = live.filter((t) => t.billing.status === 'active')
-  const trial = live.filter((t) => t.billing.status === 'trialing')
-  const requests = live.filter((t) => Boolean(t.billing.requestedPlan))
+  const live = tenants.filter((t) => !t.isAdmin && !t.isDemo && !t.deletedAt)
+  const removed = tenants.filter((t) => !t.isAdmin && !t.isDemo && t.deletedAt)
+  const paying = live.filter((t) => t.billing.status === 'active' || paidLive(t))
+  const trial = live.filter((t) => t.billing.status === 'trialing' && !paidLive(t))
+  const requests = live.filter((t) => Boolean(t.billing.requestedPlan) && !paidLive(t))
+  const paidDesks = live.filter((t) => paidLive(t))
   const events = live.reduce((s, t) => s + t.leads.length, 0)
   const joinNotices: AppNotice[] = live.map((t) => ({
     id: `hq-new:${t.email}`,
@@ -274,9 +374,17 @@ export function Admin() {
   const requestNotices: AppNotice[] = requests.map((t) => ({
     id: `hq-request:${t.email}:${t.billing.requestedPlan}`,
     title: `${t.studio.name} asked for ${planName(t.billing.requestedPlan)}`,
-    body: `${t.email} · open HQ and switch the desk`,
+    body: `${t.email} · payment not received yet`,
     href: `/admin?studio=${encodeURIComponent(t.email)}`,
     at: t.billing.requestedAt || new Date().toISOString(),
+    sticky: true,
+  }))
+  const paidNotices: AppNotice[] = paidDesks.map((t) => ({
+    id: `hq-paid:${t.email}:${t.billing.lastPayment?.razorpayPaymentId || t.billing.lastPayment?.razorpayOrderId || 'paid'}`,
+    title: `${t.studio.name} paid for ${planName(t.billing.lastPayment?.plan)}`,
+    body: `${money(Math.round((t.billing.lastPayment?.amountPaise || 0) / 100))} · Razorpay complete · desk is live`,
+    href: `/admin?studio=${encodeURIComponent(t.email)}`,
+    at: t.billing.lastPayment?.paidAt || t.billing.lastPayment?.at || t.createdAt,
     sticky: true,
   }))
   const leadNotices: AppNotice[] = live.flatMap((t) =>
@@ -301,10 +409,12 @@ export function Admin() {
   const shown = useMemo(() => {
     const needle = q.trim().toLowerCase()
     return tenants.filter((t) => {
-      if (filter === 'live' && (t.isAdmin || t.isDemo)) return false
+      if (filter === 'records') return false
+      if (filter === 'live' && (t.isAdmin || t.isDemo || t.deletedAt)) return false
       if (filter === 'paying' && kind(t) !== 'paying') return false
       if (filter === 'trial' && kind(t) !== 'trial') return false
-      if (filter === 'request' && !t.billing.requestedPlan) return false
+      if (filter === 'request' && (t.deletedAt || !t.billing.requestedPlan || paidLive(t))) return false
+      if (filter === 'removed' && !t.deletedAt) return false
       if (!needle) return true
       const blob = [t.email, t.studio.name, t.studio.owner, t.studio.city, ...t.leads.map((l) => l.coupleName)].join(' ').toLowerCase()
       return blob.includes(needle)
@@ -322,7 +432,7 @@ export function Admin() {
           </span>
         </div>
         <div className="flex items-center gap-3 text-sm">
-          <NoticeBell extras={[...joinNotices, ...requestNotices, ...leadNotices]} />
+          <NoticeBell extras={[...paidNotices, ...joinNotices, ...requestNotices, ...leadNotices]} />
           <UserHello name={firstName(me)} />
           <Link to="/studio" className="text-gold-soft">
             My desk
@@ -345,17 +455,19 @@ export function Admin() {
           <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gold-soft">HQ</p>
           <h1 className="mt-1 font-display text-2xl sm:text-3xl">Every studio</h1>
           <p className="mt-1 max-w-2xl text-sm text-mute">
-            Paying and trial desks, the couples they booked, and site traffic only you can see.
+            Paying and trial desks, Razorpay payments, the couples they booked, and a full records download.
+            {removed.length ? ` ${removed.length} removed desk${removed.length === 1 ? '' : 's'} still sit in the database.` : ''}
           </p>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {(
             [
               ['Studios', String(live.length), 'live' as Filter],
               ['Paying', String(paying.length), 'paying' as Filter],
               ['On trial', String(trial.length), 'trial' as Filter],
-              ['Plan requests', String(requests.length), 'request' as Filter],
+              ['Asked · unpaid', String(requests.length), 'request' as Filter],
+              ['Paid', String(paidDesks.length), 'paying' as Filter],
               ['Events on file', String(events), 'live' as Filter],
             ] as const
           ).map(([k, v, next]) => (
@@ -365,7 +477,9 @@ export function Admin() {
               onClick={() => setFilter(next)}
               className={clsx(
                 'rounded-2xl border bg-ink-2 p-4 text-left',
-                k === 'Plan requests' && requests.length > 0 ? 'border-gold/50' : 'border-line',
+                (k === 'Asked · unpaid' && requests.length > 0) || (k === 'Paid' && paidDesks.length > 0)
+                  ? 'border-gold/50'
+                  : 'border-line',
               )}
             >
               <p className="text-[11px] uppercase tracking-[0.18em] text-mute">{k}</p>
@@ -392,9 +506,11 @@ export function Admin() {
             {(
               [
                 ['live', 'Live studios'],
-                ['request', 'Plan requests'],
-                ['paying', 'Paying'],
+                ['request', 'Asked · unpaid'],
+                ['paying', 'Paid / paying'],
                 ['trial', 'Trial'],
+                ['removed', 'Removed'],
+                ['records', 'Records'],
                 ['all', 'All including demo'],
               ] as const
             ).map(([id, label]) => (
@@ -416,13 +532,99 @@ export function Admin() {
         {error ? <p className="text-sm text-orange-200">{error}</p> : null}
         {!data && !error ? <p className="text-mute">Loading every desk…</p> : null}
 
+        {filter === 'records' ? (
+          <section className="space-y-4 rounded-3xl border border-line bg-ink-2 p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.18em] text-gold-soft">HQ records</p>
+                <h2 className="mt-1 font-display text-2xl">Database snapshot</h2>
+                <p className="mt-1 text-sm text-mute">
+                  Live desks, leads, quotations, Razorpay orders, and activity. Passwords and OTP hashes are not included.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 rounded-full border border-gold/35 px-3 py-1.5 text-xs text-gold-soft disabled:opacity-50"
+                disabled={packBusy}
+                onClick={() => void loadRecords()}
+              >
+                {packBusy ? 'Loading…' : 'Refresh'}
+              </button>
+            </div>
+            {packError ? <p className="text-sm text-orange-200">{packError}</p> : null}
+            {pack ? (
+              <>
+                <p className="text-xs text-mute">Exported {when(pack.exportedAt)} · {pack.desks.length} desks · {pack.payments.length} Razorpay orders · {pack.activity.length} activity rows</p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-2 rounded-full bg-gold px-3 py-1.5 text-xs text-ink"
+                    onClick={() => downloadText(`goldhour-desks-${pack.exportedAt.slice(0, 10)}.json`, JSON.stringify(pack, null, 2), 'application/json')}
+                  >
+                    <Download size={12} /> JSON
+                  </button>
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-2 rounded-full border border-gold/35 px-3 py-1.5 text-xs text-gold-soft"
+                    onClick={() => downloadText(`goldhour-desks-${pack.exportedAt.slice(0, 10)}.csv`, desksCsv(pack), 'text/csv')}
+                  >
+                    Desks CSV
+                  </button>
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-2 rounded-full border border-gold/35 px-3 py-1.5 text-xs text-gold-soft"
+                    onClick={() => downloadText(`goldhour-leads-${pack.exportedAt.slice(0, 10)}.csv`, leadsCsv(pack), 'text/csv')}
+                  >
+                    Leads CSV
+                  </button>
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-2 rounded-full border border-gold/35 px-3 py-1.5 text-xs text-gold-soft"
+                    onClick={() => downloadText(`goldhour-payments-${pack.exportedAt.slice(0, 10)}.csv`, paymentsCsv(pack), 'text/csv')}
+                  >
+                    Payments CSV
+                  </button>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[40rem] text-left text-sm">
+                    <thead className="text-[11px] uppercase tracking-[0.14em] text-mute">
+                      <tr>
+                        <th className="py-2 pr-3">Studio</th>
+                        <th className="py-2 pr-3">Email</th>
+                        <th className="py-2 pr-3">Plan</th>
+                        <th className="py-2 pr-3">Status</th>
+                        <th className="py-2 pr-3">Leads</th>
+                        <th className="py-2">Removed</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pack.desks.map((d) => (
+                        <tr key={d.email} className="border-t border-line">
+                          <td className="py-2 pr-3">{d.studio?.name || '—'}</td>
+                          <td className="py-2 pr-3 text-mute">{d.email}</td>
+                          <td className="py-2 pr-3">{planName(d.plan)}</td>
+                          <td className="py-2 pr-3">{d.status}</td>
+                          <td className="py-2 pr-3 tabular-nums">{d.leads.length}</td>
+                          <td className="py-2">{d.removedAt ? day(d.removedAt) : '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            ) : (
+              <p className="text-mute">{packBusy ? 'Loading records…' : 'Open Records to load the database snapshot.'}</p>
+            )}
+          </section>
+        ) : null}
+
         <div className="space-y-4">
-          {data && shown.length === 0 ? <p className="text-mute">No studios match that filter.</p> : null}
+          {filter !== 'records' && data && shown.length === 0 ? <p className="text-mute">No studios match that filter.</p> : null}
           {shown.map((tenant) => (
             <StudioCard
               key={tenant.email}
               tenant={tenant}
-              startsOpen={focus === tenant.email || Boolean(tenant.billing.requestedPlan)}
+              startsOpen={focus === tenant.email || Boolean(tenant.billing.requestedPlan) || paidLive(tenant)}
               onRefresh={loadHq}
             />
           ))}

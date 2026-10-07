@@ -218,7 +218,7 @@ export async function notifyPlanRequest(opts: {
   const want = opts.plan === 'studio_pro' ? 'Studio Pro' : 'Studio'
   const href = `/admin?studio=${encodeURIComponent(opts.email)}`
   const title = `${opts.studio.name} asked for ${want}`
-  const body = `${opts.email} · open HQ and switch the desk`
+  const body = `${opts.email} · payment not received yet · you can still grant ${want}`
   await pushHqNotice({
     id: hqPlanRequestId(opts.email, opts.plan),
     title,
@@ -239,13 +239,18 @@ export async function notifyPlanApproved(studio: StudioProfile, email: string, p
   )
 }
 
-export async function notifyPaid(studio: StudioProfile, email: string, plan: string, amountPaise: number) {
+export async function notifyPaid(studio: StudioProfile, email: string, plan: string, amountPaise: number, paymentId?: string) {
   if (isAdminEmail(email)) return
-  await notifyHq(
-    `[GOLDHOUR PAID] ${studio.name} · ${plan}`,
-    block(studio, email, [`Plan: ${plan}`, `Amount: ₹${Math.round(amountPaise / 100)}`]),
-    email,
-  )
+  const want = plan === 'studio_pro' ? 'Studio Pro' : 'Studio'
+  const rupees = Math.round(amountPaise / 100)
+  await pushHqNotice({
+    id: `hq-paid:${email}:${paymentId || plan}`,
+    title: `${studio.name} paid for ${want}`,
+    body: `₹${rupees} · Razorpay complete · desk is live on ${want}. No HQ approval needed.`,
+    href: `/admin?studio=${encodeURIComponent(email)}`,
+    at: new Date().toISOString(),
+    sticky: true,
+  })
 }
 
 export async function notifySimple(opts: {

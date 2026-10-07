@@ -92,6 +92,16 @@ export interface StudioState {
   quotations: Quotation[]
 }
 
+export interface LastPayment {
+  plan: string
+  amountPaise: number
+  status: 'created' | 'paid' | string
+  at: string
+  paidAt: string | null
+  razorpayOrderId: string
+  razorpayPaymentId: string | null
+}
+
 export interface Billing {
   plan: string
   status: 'trialing' | 'active' | 'expired' | string
@@ -100,6 +110,7 @@ export interface Billing {
   active: boolean
   requestedPlan?: string | null
   requestedAt?: string | null
+  lastPayment?: LastPayment | null
 }
 
 export interface StudioSnapshot extends StudioState {
@@ -116,6 +127,7 @@ export interface StudioSnapshot extends StudioState {
 export interface AdminTenant {
   email: string
   createdAt: string
+  deletedAt?: string | null
   isDemo: boolean
   isAdmin: boolean
   studio: StudioProfile

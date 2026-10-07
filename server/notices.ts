@@ -7,7 +7,7 @@ import { DEMO_EMAIL, isAdminEmail } from './constants.ts'
 import { toDay, toIso } from './iso.ts'
 import { billingStatus, todayIso } from './plans.ts'
 
-const SKIP = new Set(['admin.overview', 'admin.sms-key', 'logout', 'login.fail', 'login.lockout', 'authz.denied'])
+const SKIP = new Set(['admin.overview', 'admin.sms-key', 'admin.export', 'logout', 'login.fail', 'login.lockout', 'authz.denied'])
 
 const LABELS: Record<string, string> = {
   register: 'Started a 14-day trial',
@@ -21,6 +21,9 @@ const LABELS: Record<string, string> = {
   'billing.request': 'Asked to start a paid plan',
   'billing.activate': 'HQ started a paid plan',
   'billing.paid': 'Paid for GoldHour',
+  'desk.remove': 'HQ removed a studio desk',
+  'desk.restore': 'HQ restored a studio desk',
+  'login.removed': 'Tried to sign in after HQ removed the desk',
   'password.forgot': 'Asked for a password reset',
   'password.reset': 'Changed password',
   'email.verified': 'Confirmed studio email',
@@ -248,7 +251,7 @@ export function hqNotices(opts: { tenants: TenantPublic[]; audit: AuditRow[]; in
 
   for (const t of opts.tenants) {
     try {
-      if (t.user.email === DEMO_EMAIL || isAdminEmail(t.user.email)) continue
+      if (t.user.email === DEMO_EMAIL || isAdminEmail(t.user.email) || t.user.deletedAt) continue
       const email = t.user.email
       const name = t.studio?.name || email
       const billing = t.sub

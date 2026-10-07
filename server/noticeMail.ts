@@ -85,7 +85,7 @@ export async function syncHqInbox(tenants: TenantPublic[]) {
   const fresh: AppNotice[] = []
   for (const t of tenants) {
     const email = t.user.email
-    if (!email || email === DEMO_EMAIL || isAdminEmail(email)) continue
+    if (!email || email === DEMO_EMAIL || isAdminEmail(email) || t.user.deletedAt) continue
     const name = t.studio?.name || email
     fresh.push(
       hqJoinNotice({
