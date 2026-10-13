@@ -822,7 +822,7 @@ app.post('/billing/checkout', async (c) => {
     return c.json(
       {
         error: authFail
-          ? 'Razorpay rejected these API keys. In Razorpay Dashboard open Test mode, generate a new Key ID + Key Secret pair, and send both again.'
+          ? 'Razorpay rejected these API keys. In Live mode, generate a new Key ID + Key Secret and send both again.'
           : 'Could not start checkout. Try again.',
       },
       502,
