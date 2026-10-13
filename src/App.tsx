@@ -5,6 +5,7 @@ import { VisitTracker } from './components/VisitTracker.tsx'
 import { Padmavathi } from './components/Padmavathi.tsx'
 import { TabGuard } from './components/TabGuard.tsx'
 import { Landing } from './pages/Landing.tsx'
+import { Guide } from './pages/Guide.tsx'
 import { StudioLogin } from './pages/StudioLogin.tsx'
 import { Signup } from './pages/Signup.tsx'
 import { Billing } from './pages/Billing.tsx'
@@ -38,6 +39,7 @@ export function App() {
       <Padmavathi />
       <Routes>
         <Route path="/" element={<Landing />} />
+        <Route path="/guide" element={<Guide />} />
         <Route path="/login" element={<StudioLogin />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/forgot" element={<Forgot />} />

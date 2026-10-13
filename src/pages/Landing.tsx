@@ -121,6 +121,9 @@ export function Landing() {
             <a href="#pricing" className="hover:text-cream">
               Pricing
             </a>
+            <Link to="/guide" className="hover:text-cream">
+              Tutorial
+            </Link>
           </nav>
           <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <Link to="/login" className="text-sm text-mute hover:text-cream">

@@ -7,7 +7,8 @@
     "dev": "concurrently -k \"npm:dev:api\" \"npm:dev:ui\"",
     "dev:ui": "vite",
     "dev:api": "tsx watch --env-file=.env.local server/dev.ts",
-    "build": "tsc -b && vite build && node scripts/copy-404.mjs && node scripts/bundle-api.mjs",
+    "guide:pdf": "node scripts/studio-guide-pdf.mjs",
+    "build": "tsc -b && node scripts/studio-guide-pdf.mjs && vite build && node scripts/copy-404.mjs && node scripts/bundle-api.mjs",
     "lint": "oxlint src",
     "preview": "vite preview"
   },

@@ -25,6 +25,11 @@ export function SiteFooter() {
               </a>
             </li>
             <li>
+              <Link to="/guide" className="hover:text-cream">
+                Studio tutorial
+              </Link>
+            </li>
+            <li>
               <Link to="/signup" className="hover:text-cream">
                 14-day trial
               </Link>

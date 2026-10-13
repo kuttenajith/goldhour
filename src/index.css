@@ -260,3 +260,11 @@ html[data-theme='daylight'] .landing-bg__veil {
 html[data-theme='daylight'] .landing-bg__gold {
   background: radial-gradient(ellipse at 50% 100%, rgba(154, 115, 16, 0.18), transparent 64%);
 }
+
+@media print {
+  body {
+    background: #0c0a09 !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}
