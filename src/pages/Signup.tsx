@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { BrandMark } from '../components/BrandMark.tsx'
 import { Button } from '../components/Button.tsx'
+import { GoogleButton } from '../components/GoogleButton.tsx'
 import { Field, fieldBox } from '../components/Field.tsx'
 import { acceptSession, api, homeAfterAuth } from '../lib/store.ts'
 import {
@@ -114,9 +115,13 @@ export function Signup() {
         <BrandMark />
         <h1 className="mt-10 font-display text-4xl sm:text-5xl">Start your studio desk</h1>
         <p className="mt-3 text-mute">
-          14 days free. Then ₹999 / month for Studio, or ₹1,500 for Studio Pro (calendar, pipeline, Pulse, chatbot). Your leads stay on the server, not in this browser.
+          14 days free. Continue with Google (no OTP), or fill the form and confirm your mobile. Then ₹999 / month for Studio, or ₹1,500 for Studio Pro.
         </p>
-        <form onSubmit={submit} className="mt-10 space-y-5" noValidate>
+        <div className="mt-10">
+          <GoogleButton label="Continue with Google" />
+          <p className="my-5 text-center text-xs uppercase tracking-[0.2em] text-mute">or email and OTP</p>
+        </div>
+        <form onSubmit={submit} className="space-y-5" noValidate>
           <Field label="Studio name" error={errors.studioName} required>
             <input
               className={fieldBox(errors.studioName)}

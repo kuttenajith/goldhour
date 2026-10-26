@@ -1,4 +1,5 @@
 import { Navigate, Outlet } from 'react-router-dom'
+import { needsStudioWelcome } from '../lib/planAccess.ts'
 import { useSession } from '../lib/store.ts'
 
 function Loading({ label }: { label: string }) {
@@ -13,6 +14,7 @@ export function RequireStudio() {
   const session = useSession()
   if (session.status === 'unknown') return <Loading label="Opening the desk…" />
   if (session.status === 'guest') return <Navigate to="/login" replace />
+  if (needsStudioWelcome(session.data)) return <Navigate to="/welcome" replace />
   if (!session.data.billing.active) return <Navigate to="/studio/billing" replace />
   return <Outlet />
 }

@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { BrandMark } from '../components/BrandMark.tsx'
 import { Button } from '../components/Button.tsx'
+import { GoogleButton } from '../components/GoogleButton.tsx'
 import { Field, fieldBox } from '../components/Field.tsx'
 import { acceptSession, api, homeAfterAuth } from '../lib/store.ts'
 import { emailError, onlyPhone } from '../lib/input.ts'
@@ -13,6 +14,21 @@ export function StudioLogin() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const verify = params.get('verify')
+  const google = params.get('google')
+  const googleHint =
+    google === 'off'
+      ? 'Google sign-in is not connected yet. Use email and password, or send HQ the Google Client ID and secret.'
+      : google === 'denied'
+        ? 'Google sign-in was cancelled.'
+        : google === 'email'
+          ? 'Google did not share a verified email. Allow email access, or sign up with OTP.'
+          : google === 'removed'
+            ? 'This studio desk was removed. Contact GoldHour HQ.'
+            : google === 'busy'
+              ? 'Too many sign-in attempts. Wait 15 minutes.'
+              : google
+                ? 'Google sign-in failed. Try again, or use email and password.'
+                : ''
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [pin, setPin] = useState('')
@@ -82,11 +98,16 @@ export function StudioLogin() {
         <h1 className="mt-10 font-display text-4xl sm:text-5xl">Studio sign in</h1>
         {verify === 'ok' ? <p className="mt-3 text-sm text-gold-soft">Email confirmed. Sign in.</p> : null}
         {verify === 'expired' ? <p className="mt-3 text-sm text-orange-200">That confirmation link expired.</p> : null}
+        {googleHint ? <p className="mt-3 text-sm text-orange-200">{googleHint}</p> : null}
         <p className="mt-3 max-w-md text-mute">
-          Sign in to your desk, or open the Madurai demo with PIN{' '}
+          Sign in with Google, or email. Open the Madurai demo with PIN{' '}
           <span className="text-gold-soft">2026</span>.
         </p>
-        <form onSubmit={submit} className="mt-10 max-w-sm space-y-5">
+        <div className="mt-10 max-w-sm">
+          <GoogleButton label="Continue with Google" />
+          <p className="my-5 text-center text-xs uppercase tracking-[0.2em] text-mute">or email</p>
+        </div>
+        <form onSubmit={submit} className="max-w-sm space-y-5">
           <Field label="Email" error={emailHint} required>
             <input
               required

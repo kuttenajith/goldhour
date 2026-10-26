@@ -22,6 +22,8 @@ if (!user) {
     createdAt: new Date().toISOString(),
     emailVerifiedAt: new Date().toISOString(),
     role: 'hq',
+    deletedAt: null,
+    googleId: null,
   }
   await db.insertUser(user)
   console.log('created HQ user')

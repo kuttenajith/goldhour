@@ -11,7 +11,9 @@ const SKIP = new Set(['admin.overview', 'admin.sms-key', 'admin.export', 'logout
 
 const LABELS: Record<string, string> = {
   register: 'Started a 14-day trial',
+  'register.google': 'Started a 14-day trial with Google',
   'login.ok': 'Signed in',
+  'login.google': 'Signed in with Google',
   'login.demo': 'Opened the demo desk',
   'studio.update': 'Updated the desk',
   'lead.create': 'New enquiry',

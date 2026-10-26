@@ -13,7 +13,7 @@ const steps = [
   {
     n: '02',
     title: 'Try the demo, or create your studio',
-    body: 'Demo: Log in → PIN 2026. That is Meenakshi Frames with sample couples. Your studio: Get started. Enter studio name, your name, city, 10-digit mobile. Confirm the SMS OTP, then email and password (8+ characters). You get 14 days free.',
+    body: 'Demo: Log in → PIN 2026. That is Meenakshi Frames with sample couples. Your studio: Get started. Fastest path is Continue with Google (then studio name, your name, city). Or enter studio name, mobile OTP, email and password (8+ characters). You get 14 days free.',
   },
   {
     n: '03',

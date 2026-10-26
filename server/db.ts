@@ -19,6 +19,7 @@ export type UserRow = {
   emailVerifiedAt: string | null
   role: UserRole
   deletedAt: string | null
+  googleId: string | null
 }
 
 export type SessionRow = {
@@ -104,7 +105,9 @@ export type Store = {
   migrate(): Promise<void>
   findUserByEmail(email: string): Promise<UserRow | null>
   findUserById(id: string): Promise<UserRow | null>
+  findUserByGoogleId(googleId: string): Promise<UserRow | null>
   insertUser(user: UserRow): Promise<void>
+  linkGoogle(userId: string, googleId: string): Promise<void>
   getStudio(userId: string): Promise<StudioRow | null>
   upsertStudio(studio: StudioRow): Promise<void>
   getSub(userId: string): Promise<SubRow | null>
@@ -138,10 +141,27 @@ export type Store = {
   listHqNotices(): Promise<AppNotice[]>
 }
 
-function mapUser(row: Partial<UserRow> & { id: string; email: string; passwordHash?: string; password_hash?: string; createdAt?: string; created_at?: string; emailVerifiedAt?: string | null; email_verified_at?: string | null; deletedAt?: string | null; deleted_at?: string | null; role?: string }): UserRow {
+function mapUser(
+  row: Partial<UserRow> & {
+    id: string
+    email: string
+    passwordHash?: string
+    password_hash?: string
+    createdAt?: string
+    created_at?: string
+    emailVerifiedAt?: string | null
+    email_verified_at?: string | null
+    deletedAt?: string | null
+    deleted_at?: string | null
+    googleId?: string | null
+    google_id?: string | null
+    role?: string
+  },
+): UserRow {
   const email = String(row.email).toLowerCase()
   const verified = row.emailVerifiedAt ?? row.email_verified_at ?? null
   const deleted = row.deletedAt ?? row.deleted_at ?? null
+  const googleId = (row.googleId ?? row.google_id ?? '') || null
   return {
     id: row.id,
     email,
@@ -150,6 +170,7 @@ function mapUser(row: Partial<UserRow> & { id: string; email: string; passwordHa
     emailVerifiedAt: verified ? toIso(verified) || null : null,
     role: row.role === 'hq' || email === ADMIN_EMAIL ? 'hq' : 'owner',
     deletedAt: deleted ? toIso(deleted) || null : null,
+    googleId: googleId ? String(googleId) : null,
   }
 }
 
@@ -229,6 +250,7 @@ async function seedDemo(store: Store) {
     emailVerifiedAt: new Date().toISOString(),
     role: 'owner',
     deletedAt: null,
+    googleId: null,
   }
   await store.insertUser(user)
   await store.upsertStudio({
@@ -311,6 +333,11 @@ function fileStore(path: string): Store {
     },
     async findUserById(id) {
       const row = read().users.find((u) => u.id === id)
+      return row ? mapUser(row) : null
+    },
+    async findUserByGoogleId(googleId) {
+      if (!googleId) return null
+      const row = read().users.find((u) => u.googleId === googleId)
       return row ? mapUser(row) : null
     },
     async insertUser(user) {
@@ -401,6 +428,14 @@ function fileStore(path: string): Store {
       const user = db.users.find((u) => u.id === userId)
       if (!user) return
       user.passwordHash = passwordHash
+      write(db)
+    },
+    async linkGoogle(userId, googleId) {
+      const db = read()
+      const user = db.users.find((u) => u.id === userId)
+      if (!user) return
+      user.googleId = googleId
+      if (!user.emailVerifiedAt) user.emailVerifiedAt = new Date().toISOString()
       write(db)
     },
     async markEmailVerified(userId) {
@@ -540,6 +575,8 @@ function postgresStore(url: string): Store {
       await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified_at timestamptz`
       await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS role text NOT NULL DEFAULT 'owner'`
       await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at timestamptz`
+      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id text`
+      await sql`CREATE UNIQUE INDEX IF NOT EXISTS users_google_id_idx ON users (google_id) WHERE google_id IS NOT NULL`
       await sql`UPDATE users SET email_verified_at = COALESCE(email_verified_at, created_at)`
       await sql`UPDATE users SET role = 'hq' WHERE lower(email) = ${ADMIN_EMAIL}`
       await sql`CREATE TABLE IF NOT EXISTS studios (
@@ -635,18 +672,24 @@ function postgresStore(url: string): Store {
     },
     async findUserByEmail(email) {
       const needle = email.trim().toLowerCase()
-      const rows = await sql`SELECT id, email, password_hash AS "passwordHash", created_at AS "createdAt", email_verified_at AS "emailVerifiedAt", role, deleted_at AS "deletedAt" FROM users WHERE lower(email) = ${needle}`
+      const rows = await sql`SELECT id, email, password_hash AS "passwordHash", created_at AS "createdAt", email_verified_at AS "emailVerifiedAt", role, deleted_at AS "deletedAt", google_id AS "googleId" FROM users WHERE lower(email) = ${needle}`
       const row = rows[0] as Parameters<typeof mapUser>[0] | undefined
       return row ? mapUser(row) : null
     },
     async findUserById(id) {
-      const rows = await sql`SELECT id, email, password_hash AS "passwordHash", created_at AS "createdAt", email_verified_at AS "emailVerifiedAt", role, deleted_at AS "deletedAt" FROM users WHERE id = ${id}`
+      const rows = await sql`SELECT id, email, password_hash AS "passwordHash", created_at AS "createdAt", email_verified_at AS "emailVerifiedAt", role, deleted_at AS "deletedAt", google_id AS "googleId" FROM users WHERE id = ${id}`
+      const row = rows[0] as Parameters<typeof mapUser>[0] | undefined
+      return row ? mapUser(row) : null
+    },
+    async findUserByGoogleId(googleId) {
+      if (!googleId) return null
+      const rows = await sql`SELECT id, email, password_hash AS "passwordHash", created_at AS "createdAt", email_verified_at AS "emailVerifiedAt", role, deleted_at AS "deletedAt", google_id AS "googleId" FROM users WHERE google_id = ${googleId}`
       const row = rows[0] as Parameters<typeof mapUser>[0] | undefined
       return row ? mapUser(row) : null
     },
     async insertUser(user) {
       try {
-        await sql`INSERT INTO users (id, email, password_hash, created_at, email_verified_at, role, deleted_at) VALUES (${user.id}, ${user.email}, ${user.passwordHash}, ${user.createdAt}, ${user.emailVerifiedAt}, ${user.role}, ${user.deletedAt})`
+        await sql`INSERT INTO users (id, email, password_hash, created_at, email_verified_at, role, deleted_at, google_id) VALUES (${user.id}, ${user.email}, ${user.passwordHash}, ${user.createdAt}, ${user.emailVerifiedAt}, ${user.role}, ${user.deletedAt}, ${user.googleId})`
       } catch (err) {
         const message = err instanceof Error ? err.message : ''
         if (message.includes('unique') || message.includes('duplicate')) throw new Error('EMAIL_TAKEN')
@@ -739,6 +782,9 @@ function postgresStore(url: string): Store {
     },
     async updatePassword(userId, passwordHash) {
       await sql`UPDATE users SET password_hash = ${passwordHash} WHERE id = ${userId}`
+    },
+    async linkGoogle(userId, googleId) {
+      await sql`UPDATE users SET google_id = ${googleId}, email_verified_at = COALESCE(email_verified_at, now()) WHERE id = ${userId}`
     },
     async markEmailVerified(userId) {
       await sql`UPDATE users SET email_verified_at = now() WHERE id = ${userId}`

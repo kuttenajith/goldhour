@@ -34,11 +34,11 @@ GoldHour is **not** a client portal, album proofing tool, photo storage product,
 
 | Role | How they enter | What they get |
 | --- | --- | --- |
-| Wedding photographer / studio owner | `/signup` after Indian mobile OTP | 14-day trial of the full desk, then Studio ₹999 / month or Studio Pro ₹1,500 / month |
+| Wedding photographer / studio owner | `/signup` with Google, or Indian mobile OTP + password | 14-day trial of the full desk, then Studio ₹999 / month or Studio Pro ₹1,500 / month |
 | Demo visitor | `/login` → PIN `2026` | Meenakshi Frames (Madurai) sample desk. Stays free. Cannot subscribe. |
 | HQ / operator | `/login` with HQ email | `/admin` plus a personal desk. Stays free. Does not go through Razorpay. |
 
-One human = one studio account today. There is **no team RBAC** (editor / accountant), no Google login, and no MFA.
+One human = one studio account today. There is **no team RBAC** (editor / accountant) and no MFA. Google Sign-In is live when `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` are set on Vercel.
 
 ---
 
@@ -47,8 +47,9 @@ One human = one studio account today. There is **no team RBAC** (editor / accoun
 | Path | Who | Purpose |
 | --- | --- | --- |
 | `/` | Anyone | Marketing landing |
-| `/signup` | New studio | Create account (OTP + password) |
-| `/login` | Studio / HQ / demo | Sign in |
+| `/signup` | New studio | Create account (Google, or OTP + password) |
+| `/login` | Studio / HQ / demo | Google, email, or demo PIN |
+| `/welcome` | New Google studio | Studio name, owner, city (phone optional) |
 | `/forgot` · `/reset` | Studio | Password reset |
 | `/studio` | Signed-in studio with active billing | Desk home |
 | `/studio/leads` · `/studio/leads/:id` | Studio | Enquiries and one wedding |
@@ -74,7 +75,7 @@ Unknown routes redirect to `/`.
 | Frontend | **Vite 8** + **React 19** + **TypeScript** + **React Router 7** + **Tailwind CSS 4** | SPA. CSS is utility-first with a dark “ink / gold / cream” wedding-desk look. Icons: Lucide. |
 | Backend | **Hono** on Node | One `server/app.ts` mounted at `/api`. Local: `@hono/node-server` on port **8788**. Production: esbuild bundle `api/_bundle.mjs` behind Vercel Node functions. |
 | Database | **Neon Postgres** (`@neondatabase/serverless`) | Production source of truth. Local fallback: `.data/goldhour.json` if `DATABASE_URL` is missing. |
-| Auth | Email + password (**scrypt**), JWT cookie `goldhour_session`, Indian SMS OTP via **2Factor** | Cookie is HttpOnly, Secure on HTTPS, SameSite=Lax, 7 days. Logout and password reset revoke sessions. |
+| Auth | Email + password (**scrypt**), **Google OAuth 2.0** (authorization code), JWT cookie `goldhour_session`, Indian SMS OTP via **2Factor** | Cookie is HttpOnly, Secure on HTTPS, SameSite=Lax, 7 days. Logout and password reset revoke sessions. Google users skip OTP. Same Google email links to an existing desk. |
 | Payments | **Razorpay Checkout.js** (orders API + HMAC confirm + optional webhook) | Test keys on Vercel today. Live keys needed before taking real money. |
 | Mail | Sequential fallback: Gmail SMTP → **Resend** → Web3Forms → FormSubmit | HQ always gets a copy of studio mail except OTP codes. |
 | PDF quotes | **jsPDF** in the browser | No server-side PDF worker. |
@@ -127,8 +128,9 @@ flowchart LR
 | File | Route | Notes |
 | --- | --- | --- |
 | `Landing.tsx` | `/` | Marketing. Enquiry → quote → follow-up → payments → Pro extras. |
-| `Signup.tsx` | `/signup` | Studio name, owner, city, 10-digit phone, OTP, email, 8+ char password. |
-| `StudioLogin.tsx` | `/login` | Email/password or demo PIN. |
+| `Signup.tsx` | `/signup` | Continue with Google, or studio name, owner, city, 10-digit phone, OTP, email, 8+ char password. |
+| `StudioLogin.tsx` | `/login` | Google, email/password, or demo PIN. |
+| `Welcome.tsx` | `/welcome` | First Google sign-in: studio name, owner, city. |
 | `Forgot.tsx` / `Reset.tsx` | `/forgot` `/reset` | Tokenised reset. |
 | `Dashboard.tsx` | `/studio` | Today’s desk: due follow-ups, money, next weddings. |
 | `Leads.tsx` / `LeadDetail.tsx` | leads | Full wedding record. |
@@ -185,6 +187,8 @@ Hobby plan: keep function count low (nested `api/auth`, `api/billing`, `api/admi
 | POST | `/api/auth/otp-send` | SMS OTP to Indian 10-digit number |
 | POST | `/api/auth/otp-verify` | Check 6-digit code (10 min, 5 tries, 8s resend gap) |
 | POST | `/api/auth/register` | Create studio (OTP required except HQ) |
+| GET | `/api/auth/google` | Start Google OAuth (flat path — Vercel one extra segment) |
+| GET | `/api/auth/google-callback` | Google redirect: exchange code, set session |
 | POST | `/api/auth/login` | Email + password |
 | POST | `/api/auth/demo` | PIN `2026` |
 | POST | `/api/auth/forgot` | Reset token |
@@ -251,7 +255,7 @@ Schema is created on first API request (`migrate()`). Extra columns use `ALTER T
 
 | Table | Purpose |
 | --- | --- |
-| `users` | Account. `id`, `email` unique, `password_hash` (scrypt `salt:hash`), `created_at`, `email_verified_at`, `role` (`owner` \| `hq`), `deleted_at` (soft delete) |
+| `users` | Account. `id`, `email` unique, `password_hash` (scrypt `salt:hash`), `created_at`, `email_verified_at`, `role` (`owner` \| `hq`), `deleted_at` (soft delete), `google_id` (unique when set) |
 | `studios` | One row per user. Profile fields + **`leads jsonb`** + **`quotations jsonb`** |
 | `subscriptions` | `plan`, `status`, `trial_ends_on`, `period_ends_on`, `razorpay_payment_id`, `requested_plan` |
 | `billing_orders` | Razorpay orders: plan, amount (paise), status `created`/`paid`, `paid_at`, payment id |
@@ -455,6 +459,8 @@ Set on Vercel **Production** (and Preview if you test checkout there). Copy from
 | `RAZORPAY_KEY_ID` | For checkout | Publishable key |
 | `RAZORPAY_KEY_SECRET` | For checkout | Orders + confirm HMAC |
 | `RAZORPAY_WEBHOOK_SECRET` | Optional | Webhook verify |
+| `GOOGLE_CLIENT_ID` | For Google Sign-In | OAuth Web client |
+| `GOOGLE_CLIENT_SECRET` | For Google Sign-In | Never commit |
 | `TWOFACTOR_API_KEY` | For signup OTP | Indian SMS |
 | `TWOFACTOR_SMS_TEMPLATE` | Optional | Default `OTP1` |
 | `FAST2SMS_API_KEY` | Optional | OTP fallback |
@@ -517,7 +523,7 @@ goldhour/
 **Shipped and supportable**
 
 - Multi-tenant studio accounts on Postgres  
-- Indian SMS OTP signup  
+- Google Sign-In and Indian SMS OTP signup  
 - Trial → Razorpay Studio / Pro → auto-activate  
 - Expiry, renew, upgrade, HQ grant  
 - Soft-delete desks + records export  
@@ -526,7 +532,7 @@ goldhour/
 
 **Do not list as live until built**
 
-- Google login, MFA, invite teammates  
+- MFA, invite teammates  
 - WhatsApp API / template approvals  
 - Client (bride) login, album proofing, photo CDN  
 - E-sign contracts, GST invoices  

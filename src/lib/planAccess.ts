@@ -16,6 +16,12 @@ export function hasProDesk(snap: StudioSnapshot) {
   return tier === 'hq' || tier === 'demo' || tier === 'trial' || tier === 'studio_pro'
 }
 
+export function needsStudioWelcome(snap: StudioSnapshot) {
+  if (snap.isAdmin || snap.isDemo) return false
+  const studio = snap.studio
+  return studio.name.trim().length < 2 || studio.owner.trim().length < 2 || studio.city.trim().length < 2
+}
+
 export function planLabel(snap: StudioSnapshot) {
   switch (deskTier(snap)) {
     case 'hq':

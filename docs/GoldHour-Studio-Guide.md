@@ -15,7 +15,7 @@ On your phone or laptop go to goldhour-chi.vercel.app. Use Chrome. Keep only one
 ## 02  Try the demo, or create your studio
 
 - **Demo:** Log in → PIN **2026** (Meenakshi Frames, sample couples).
-- **Your studio:** Get started. Studio name, your name, city, 10-digit mobile. Confirm the SMS OTP, then email and an 8+ character password. **14 days free.**
+- **Your studio:** Get started. Fastest: **Continue with Google**, then studio name, your name, city. Or studio name, 10-digit mobile OTP, email and an 8+ character password. **14 days free.**
 
 ## 03  Save the enquiry the same hour it arrives
 

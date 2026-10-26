@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react'
 import { normalizeLead } from './booking.ts'
 import { isTabStale, releaseTab } from './tabLock.ts'
+import { needsStudioWelcome } from './planAccess.ts'
 import type { Lead, Payment, Quotation, StudioProfile, StudioSnapshot } from './types.ts'
 
 const EMPTY: StudioSnapshot = {
@@ -126,7 +127,9 @@ export function acceptSession(data: StudioSnapshot) {
 }
 
 export function homeAfterAuth(data: StudioSnapshot) {
-  return data.isAdmin ? '/admin' : '/studio'
+  if (data.isAdmin) return '/admin'
+  if (needsStudioWelcome(data)) return '/welcome'
+  return '/studio'
 }
 
 export async function logoutStudio() {

@@ -8,6 +8,7 @@ import { Landing } from './pages/Landing.tsx'
 import { Guide } from './pages/Guide.tsx'
 import { StudioLogin } from './pages/StudioLogin.tsx'
 import { Signup } from './pages/Signup.tsx'
+import { Welcome } from './pages/Welcome.tsx'
 import { Billing } from './pages/Billing.tsx'
 import { Admin } from './pages/Admin.tsx'
 import { Activity } from './pages/Activity.tsx'
@@ -45,6 +46,7 @@ export function App() {
         <Route path="/forgot" element={<Forgot />} />
         <Route path="/reset" element={<Reset />} />
         <Route element={<RequireAuth />}>
+          <Route path="/welcome" element={<Welcome />} />
           <Route path="/studio/billing" element={<Billing />} />
         </Route>
         <Route element={<RequireAdmin />}>

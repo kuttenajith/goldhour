@@ -5,6 +5,7 @@ Studio data is isolated by the signed-in user. There is no `/api/leads/:id` — 
 ## In production now
 
 - Email + password with **scrypt** (not SHA-256, not plaintext)
+- Google Sign-In (authorization code + CSRF `state` cookie). Same Google email links to an existing desk.
 - HttpOnly + Secure + SameSite=Lax session cookie
 - Session id in JWT; **logout and password reset revoke sessions**
 - 7-day session expiry
@@ -19,6 +20,6 @@ Studio data is isolated by the signed-in user. There is no `/api/leads/:id` — 
 
 ## Not yet (later phases)
 
-Google login, MFA, team RBAC (editor/accountant), signed photo URLs, Argon2id, backups UI, Copilot.
+MFA, team RBAC (editor/accountant), signed photo URLs, Argon2id, backups UI, Copilot.
 
 Set `RESEND_API_KEY` and `MAIL_FROM` on Vercel when you want reset/verify mail to hit the studio inbox directly.

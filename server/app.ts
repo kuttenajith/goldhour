@@ -27,6 +27,7 @@ import {
   webhookSignature,
 } from './crypto.ts'
 import { emptyStudio, getStore, type AuditRow, type UserRow } from './db.ts'
+import { googleAuthUrl, googleConfigured, googleProfileFromCode, type GoogleProfile } from './google.ts'
 import { mailUser } from './mail.ts'
 import { syncHqInbox } from './noticeMail.ts'
 import { hqNotices, studioNotices } from './notices.ts'
@@ -86,6 +87,38 @@ function cookieOpts(url: string) {
     path: '/',
     maxAge: 60 * 60 * 24 * SESSION_DAYS,
   }
+}
+
+function oauthCookieOpts(url: string) {
+  return {
+    httpOnly: true,
+    sameSite: 'Lax' as const,
+    secure: url.startsWith('https'),
+    path: '/',
+    maxAge: 10 * 60,
+  }
+}
+
+function publicOrigin(c: Context) {
+  const forwarded = (c.req.header('x-forwarded-host') || '').split(',')[0].trim()
+  const proto = (c.req.header('x-forwarded-proto') || (c.req.url.startsWith('https') ? 'https' : 'http'))
+    .split(',')[0]
+    .trim()
+  if (forwarded) return `${proto}://${forwarded}`
+  try {
+    return new URL(c.req.url).origin
+  } catch {
+    return APP_URL
+  }
+}
+
+function studioReadyPath(data: NonNullable<Awaited<ReturnType<typeof snapshot>>>) {
+  if (data.isAdmin) return '/admin'
+  const studio = data.studio
+  if (studio.name.trim().length < 2 || studio.owner.trim().length < 2 || studio.city.trim().length < 2) {
+    return '/welcome'
+  }
+  return '/studio'
 }
 
 async function audit(opts: { action: string; userId?: string | null; studioId?: string | null; detail?: string; ip?: string }) {
@@ -198,6 +231,7 @@ async function claimAdmin(password: string) {
     emailVerifiedAt: new Date().toISOString(),
     role: 'hq',
     deletedAt: null,
+    googleId: null,
   }
   await db.insertUser(user)
   await db.upsertStudio({
@@ -267,6 +301,88 @@ async function lockedOut(email: string, ip: string) {
   const since = new Date(Date.now() - AUTH_WINDOW_MS).toISOString()
   const counts = await getStore().countRecentFailures(email, ip, since)
   return counts.email >= AUTH_MAX_FAILS || counts.ip >= AUTH_MAX_IP
+}
+
+async function ensureOwnerDesk(userId: string, profile: { name: string; owner: string }) {
+  const db = getStore()
+  if (!(await db.getStudio(userId))) {
+    await db.upsertStudio(emptyStudio(userId, { name: profile.name, owner: profile.owner, city: '', phone: '' }))
+  }
+  if (!(await db.getSub(userId))) {
+    await db.upsertSub({
+      userId,
+      plan: 'trial',
+      status: 'trialing',
+      trialEndsOn: trialEnd(),
+      periodEndsOn: null,
+      razorpayPaymentId: null,
+      requestedPlan: null,
+    })
+  }
+}
+
+async function finishGoogleSignIn(c: Context, origin: string, profile: GoogleProfile) {
+  const db = getStore()
+  const ip = clientIp(c)
+  const email = profile.email
+  const googleId = profile.sub
+  const admin = isAdminEmail(email)
+  if (await lockedOut(email, ip)) return c.redirect(`${origin}/login?google=busy`)
+
+  let user = await db.findUserByGoogleId(googleId)
+  let created = false
+  const owner = (profile.givenName || profile.name || email.split('@')[0] || 'Studio').slice(0, 80)
+  const studioName = (profile.name || `${owner} Studio`).slice(0, 80)
+
+  if (!user) {
+    user = await db.findUserByEmail(email)
+    if (user) {
+      if (user.googleId && user.googleId !== googleId) {
+        return c.redirect(`${origin}/login?google=error`)
+      }
+      await db.linkGoogle(user.id, googleId)
+      user = { ...user, googleId, emailVerifiedAt: user.emailVerifiedAt || new Date().toISOString() }
+    } else {
+      user = {
+        id: newId(),
+        email,
+        passwordHash: hashPassword(randomToken()),
+        createdAt: new Date().toISOString(),
+        emailVerifiedAt: new Date().toISOString(),
+        role: admin ? 'hq' : 'owner',
+        deletedAt: null,
+        googleId,
+      }
+      try {
+        await db.insertUser(user)
+      } catch (err) {
+        if (err instanceof Error && err.message === 'EMAIL_TAKEN') {
+          return c.redirect(`${origin}/login?google=error`)
+        }
+        throw err
+      }
+      created = true
+    }
+  }
+
+  if (user.deletedAt) return c.redirect(`${origin}/login?google=removed`)
+
+  if (admin) await ensureHq(user.id)
+  else await ensureOwnerDesk(user.id, { name: studioName, owner })
+
+  await db.recordAuthAttempt(email, ip, true)
+  await setSession(c, user.id)
+  const data = await snapshot(user.id)
+  if (!data) return c.redirect(`${origin}/login?google=error`)
+
+  if (created && !admin) {
+    await notifyStudioSignup(data.studio, email)
+    await audit({ action: 'register.google', userId: user.id, studioId: data.studioId, ip })
+  } else {
+    await audit({ action: 'login.google', userId: user.id, studioId: data.studioId, ip, detail: admin ? 'hq' : '' })
+  }
+
+  return c.redirect(`${origin}${studioReadyPath(data)}`)
 }
 
 app.get('/health', (c) => c.json({ ok: true }))
@@ -346,6 +462,41 @@ app.post('/auth/otp-verify', async (c) => {
   return c.json({ ok: true })
 })
 
+app.get('/auth/google', async (c) => {
+  const origin = publicOrigin(c)
+  if (!googleConfigured()) return c.redirect(`${origin}/login?google=off`)
+  const ip = clientIp(c)
+  if (await lockedOut('google', ip)) return c.redirect(`${origin}/login?google=busy`)
+  const state = randomToken()
+  setCookie(c, 'goldhour_oauth', state, oauthCookieOpts(c.req.url))
+  return c.redirect(googleAuthUrl(origin, state))
+})
+
+app.get('/auth/google-callback', async (c) => {
+  const origin = publicOrigin(c)
+  const fail = (reason: string) => {
+    deleteCookie(c, 'goldhour_oauth', { path: '/' })
+    return c.redirect(`${origin}/login?google=${reason}`)
+  }
+  try {
+    if (!googleConfigured()) return fail('off')
+    const denied = c.req.query('error') || ''
+    if (denied === 'access_denied') return fail('denied')
+    if (denied) return fail('error')
+    const code = (c.req.query('code') || '').trim()
+    const state = (c.req.query('state') || '').trim()
+    const expected = getCookie(c, 'goldhour_oauth') || ''
+    deleteCookie(c, 'goldhour_oauth', { path: '/' })
+    if (!code || !state || !expected || state !== expected) return fail('denied')
+    const profile = await googleProfileFromCode(code, origin)
+    if (!profile) return fail('error')
+    if (!profile.emailVerified) return fail('email')
+    return await finishGoogleSignIn(c, origin, profile)
+  } catch {
+    return fail('error')
+  }
+})
+
 app.post('/auth/register', async (c) => {
   const ip = clientIp(c)
   if (await lockedOut('signup', ip)) {
@@ -390,6 +541,7 @@ app.post('/auth/register', async (c) => {
     emailVerifiedAt: admin ? new Date().toISOString() : null,
     role: admin ? 'hq' : 'owner',
     deletedAt: null,
+    googleId: null,
   }
   try {
     await db.insertUser(user)
@@ -494,6 +646,12 @@ app.post('/auth/login', async (c) => {
   if (!user || !verifyPassword(password, user.passwordHash)) {
     await db.recordAuthAttempt(email || 'unknown', ip, false)
     await audit({ action: 'login.fail', userId: user?.id, ip })
+    if (user?.googleId) {
+      return c.json(
+        { error: 'Email or password is wrong. If you opened this desk with Google, tap Continue with Google.' },
+        401,
+      )
+    }
     return c.json({ error: 'Email or password is wrong.' }, 401)
   }
   if (user.deletedAt) {
