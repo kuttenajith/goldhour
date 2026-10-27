@@ -8,6 +8,7 @@ import {
   Columns3,
   CreditCard,
   FileText,
+  Images,
   IndianRupee,
   LayoutDashboard,
   LogOut,
@@ -39,6 +40,7 @@ const links: { to: string; label: string; icon: typeof LayoutDashboard; end?: bo
   { to: '/studio/pipeline', label: 'Pipeline', icon: Columns3, pro: true },
   { to: '/studio/follow-ups', label: 'Follow-ups', icon: Bell },
   { to: '/studio/quotations', label: 'Quotes', icon: FileText },
+  { to: '/studio/deliveries', label: 'Deliveries', icon: Images },
   { to: '/studio/payments', label: 'Payments', icon: IndianRupee },
   { to: '/studio/activity', label: 'Pulse', icon: ScrollText, pro: true },
   { to: '/studio/billing', label: 'Plan', icon: CreditCard },
@@ -167,7 +169,7 @@ export function StudioShell() {
             <div className={clsx('mt-auto flex pt-4', collapsed ? 'flex-col items-center gap-2' : 'items-center justify-between gap-2 px-1')}>
               <ThemeToggle compact={collapsed} />
               <button
-                className="inline-flex h-10 items-center gap-2 rounded-full px-1 text-sm text-mute hover:text-cream"
+                className="gh-btn inline-flex h-10 items-center gap-2 rounded-full px-1 text-sm text-mute hover:text-cream"
                 onClick={signOut}
                 title="Sign out"
               >
@@ -210,7 +212,7 @@ export function StudioShell() {
               </div>
               <div className="flex shrink-0 items-center justify-between gap-2 border-t border-line px-4 py-3">
                 <ThemeToggle />
-                <button className="inline-flex min-h-9 cursor-pointer items-center gap-2 text-sm text-mute hover:text-cream" onClick={signOut}>
+                <button className="gh-btn inline-flex min-h-9 cursor-pointer items-center gap-2 text-sm text-mute hover:text-cream" onClick={signOut}>
                   <LogOut size={14} /> Sign out
                 </button>
               </div>
@@ -233,7 +235,7 @@ export function StudioShell() {
             <div className="flex shrink-0 items-center gap-2 sm:gap-3">
               <button
                 type="button"
-                className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-line text-gold-soft hover:border-gold/50 hover:text-cream lg:hidden [@media(orientation:landscape)_and_(max-height:720px)]:!inline-flex"
+                className="gh-btn inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-line text-gold-soft hover:border-gold/50 hover:text-cream lg:hidden [@media(orientation:landscape)_and_(max-height:720px)]:!inline-flex"
                 aria-label="Open menu"
                 onClick={() => setMenuOpen(true)}
               >

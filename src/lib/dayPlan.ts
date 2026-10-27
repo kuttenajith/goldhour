@@ -50,6 +50,24 @@ export function dayPlan(leads: Lead[]): DayItem[] {
       href: '/studio/calendar',
     })
   }
+  const galleryDue = leads.filter(
+    (l) => l.galleryDueOn && l.galleryDueOn <= today && l.deliveryStatus === 'pending' && (l.status === 'booked' || l.status === 'completed'),
+  )
+  if (galleryDue.length) {
+    items.push({
+      tone: 'amber',
+      label: `${galleryDue.length} gallery${galleryDue.length === 1 ? '' : 'ies'} due`,
+      href: '/studio/deliveries',
+    })
+  }
+  const holds = leads.filter((l) => l.holdUntil && l.holdUntil <= today && l.status !== 'booked' && l.status !== 'lost' && l.status !== 'completed')
+  if (holds.length) {
+    items.push({
+      tone: 'red',
+      label: `${holds.length} date hold${holds.length === 1 ? '' : 's'} expired`,
+      href: '/studio/calendar',
+    })
+  }
   if (!items.length) {
     items.push({ tone: 'mute', label: 'Desk is clear. Save a new enquiry.', href: '/studio/leads' })
   }

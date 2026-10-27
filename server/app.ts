@@ -685,7 +685,7 @@ app.post('/auth/demo', async (c) => {
   const body = await readJson<{ pin?: string; email?: string }>(c)
   if (body.pin?.trim() !== DEMO_PIN) {
     await getStore().recordAuthAttempt('demo', ip, false)
-    return c.json({ error: 'Use PIN 2026 for the Madurai demo.' }, 401)
+    return c.json({ error: 'Use PIN 2026 for the sample demo.' }, 401)
   }
   const visitorEmail = body.email?.trim().toLowerCase() || ''
   const demo = await getStore().ensureDemo()

@@ -128,7 +128,7 @@ export function Signup() {
         </div>
         <h1 className="mt-10 font-display text-4xl sm:text-5xl">Start your studio desk</h1>
         <p className="mt-3 text-mute">
-          14 days free. Continue with Google (no OTP), or fill the form and confirm your mobile. Then ₹999 / month for Studio, or ₹1,500 for Studio Pro.
+          14 days free. Continue with Google (no OTP), or fill the form and confirm your mobile. Then ₹999 / month for Studio, or ₹1,499 for Studio Pro.
         </p>
         <div className="mt-10">
           <GoogleButton label="Continue with Google" />
@@ -173,7 +173,7 @@ export function Signup() {
                   setCity(v)
                   setErrors((p) => ({ ...p, city: v ? requiredText(v, 'the city') : '' }))
                 }}
-                placeholder="Madurai"
+                placeholder="Your city"
               />
             </Field>
           </div>

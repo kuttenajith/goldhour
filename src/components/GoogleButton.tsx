@@ -2,7 +2,7 @@ export function GoogleButton({ label }: { label: string }) {
   return (
     <a
       href="/api/auth/google"
-      className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-gold/35 bg-cream px-4 text-center text-sm leading-tight tracking-wide text-ink transition hover:bg-gold-soft"
+      className="gh-btn inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-gold/35 bg-cream px-4 text-center text-sm leading-tight tracking-wide text-ink hover:bg-gold-soft hover:shadow-[0_12px_28px_rgba(244,234,216,0.2)]"
     >
       <GoogleMark />
       {label}

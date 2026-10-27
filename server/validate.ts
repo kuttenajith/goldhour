@@ -110,6 +110,37 @@ export function validateLeads(raw: unknown): Lead[] {
       nextAction: text(row.nextAction, 160),
       nextActionOn: isoDate(row.nextActionOn),
       createdOn: isoDate(row.createdOn) || new Date().toISOString().slice(0, 10),
+      vendors: Array.isArray(row.vendors)
+        ? row.vendors.slice(0, 12).map((v) => {
+            const vendor = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>
+            return {
+              id: uuid(vendor.id) || crypto.randomUUID(),
+              role: text(vendor.role, 40) || 'Planner',
+              name: text(vendor.name, 80),
+              phone: text(vendor.phone, 20).replace(/[^\d+\s-]/g, ''),
+            }
+          })
+        : [],
+      galleryDueOn: isoDate(row.galleryDueOn),
+      albumDueOn: isoDate(row.albumDueOn),
+      deliveryStatus: row.deliveryStatus as Lead['deliveryStatus'],
+      lostReason: text(row.lostReason, 160),
+      outstation: Boolean(row.outstation),
+      travelFee: money(row.travelFee),
+      holdUntil: isoDate(row.holdUntil),
+      crewNotes: text(row.crewNotes, 1000),
+      deliverables: Array.isArray(row.deliverables)
+        ? row.deliverables.slice(0, 12).map((d) => {
+            const item = (d && typeof d === 'object' ? d : {}) as Record<string, unknown>
+            return {
+              id: uuid(item.id) || crypto.randomUUID(),
+              label: text(item.label, 80) || 'Deliverable',
+              done: Boolean(item.done),
+            }
+          })
+        : [],
+      contractStatus: row.contractStatus as Lead['contractStatus'],
+      aftercareOn: isoDate(row.aftercareOn),
     })
   })
 }

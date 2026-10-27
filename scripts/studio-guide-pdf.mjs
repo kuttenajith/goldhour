@@ -13,7 +13,7 @@ const steps = [
   ],
   [
     '02  Try the demo, or create your studio',
-    'Demo: Log in, PIN 2026 (Meenakshi Frames, sample couples). Your studio: Get started. Fastest is Continue with Google, then studio name, your name, city. Or studio name, 10-digit mobile OTP, email and an 8+ character password. 14 days free.',
+    'Demo: Log in, PIN 2026 (sample studio, sample couples). Your studio: Get started. Fastest is Continue with Google, then studio name, your name, city. Or studio name, 10-digit mobile OTP, email and an 8+ character password. 14 days free.',
   ],
   [
     '03  Save the enquiry the same hour it arrives',
@@ -78,7 +78,7 @@ doc.setFont('helvetica', 'normal')
 doc.setFontSize(11)
 doc.setTextColor(154, 143, 124)
 const intro = doc.splitTextToSize(
-  'GoldHour is the studio desk — not an album for brides. Save the enquiry, send the quote, collect the advance, then shoot. 14-day trial, then Studio ₹999 / month or Studio Pro ₹1,500 / month.',
+  'GoldHour is the studio desk — not an album for brides. Save the enquiry, send the quote, collect the advance, then shoot. 14-day trial, then Studio ₹999 / month or Studio Pro ₹1,499 / month.',
   w - 48,
 )
 doc.text(intro, 24, 88)
@@ -125,7 +125,7 @@ doc.setFont('helvetica', 'normal')
 doc.setFontSize(10)
 doc.setTextColor(154, 143, 124)
 const plans = doc.splitTextToSize(
-  'Trial 14 days ₹0 — full desk. Studio ₹999 / month — leads, PDF quotes, follow-ups, couple payments, checklist. Studio Pro ₹1,500 / month — calendar (date clashes), pipeline, Pulse, WhatsApp drafts, Padmavathi chatbot, morning briefing. Pay from Plan in the desk (UPI / GPay). The desk opens when Razorpay completes. If a month ends, leads stay saved; renew on the same screen.',
+  'Trial 14 days ₹0 — full desk. Studio ₹999 / month — leads, PDF quotes, follow-ups, couple payments, vendors, deliveries. Studio Pro ₹1,499 / month — calendar, date holds, pipeline, Pulse, crew, shot list, WhatsApp drafts, desk chatbot, morning briefing. Pay from Plan in the desk (UPI / GPay). The desk opens when Razorpay completes. If a month ends, leads stay saved; renew on the same screen.',
   w - 48,
 )
 doc.text(plans, 24, y)

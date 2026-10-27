@@ -29,7 +29,7 @@ export function TabGuard() {
         </p>
         <button
           type="button"
-          className="mt-6 inline-flex min-h-11 items-center rounded-full bg-gold px-5 text-sm text-ink"
+          className="gh-btn mt-6 inline-flex min-h-11 items-center rounded-full bg-gold px-5 text-sm text-ink hover:bg-gold-soft hover:shadow-[0_12px_28px_rgba(201,162,39,0.32)]"
           onClick={() => claimTab()}
         >
           Use this tab

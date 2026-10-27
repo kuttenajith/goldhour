@@ -1,5 +1,16 @@
 import { id } from './ids.ts'
-import type { Lead, LeadStatus, PaymentKind, PaymentPlan, TimelineSlot, WeddingEvent } from './types.ts'
+import type {
+  ContractStatus,
+  Deliverable,
+  DeliveryStatus,
+  Lead,
+  LeadStatus,
+  PaymentKind,
+  PaymentPlan,
+  TimelineSlot,
+  WeddingEvent,
+  WeddingVendor,
+} from './types.ts'
 
 export const FUNCTION_NAMES = ['Engagement', 'Mehendi', 'Wedding', 'Reception'] as const
 
@@ -56,6 +67,29 @@ export function weddingEvent(lead: Lead) {
   return lead.events.find((ev) => ev.name === 'Wedding') ?? lead.events[0]
 }
 
+export const VENDOR_ROLES = ['Planner', 'Makeup', 'Decor', 'Venue coordinator', 'Caterer'] as const
+
+export function defaultDeliverables(): Deliverable[] {
+  return [
+    { id: 'teaser', label: 'Teaser / social cut', done: false },
+    { id: 'highlight', label: 'Highlight film', done: false },
+    { id: 'album', label: 'Wedding album', done: false },
+    { id: 'gallery', label: 'Online gallery', done: false },
+    { id: 'raw', label: 'Raws / extras', done: false },
+  ]
+}
+
+const DELIVERY: DeliveryStatus[] = ['pending', 'gallery_sent', 'album_delivered']
+const CONTRACT: ContractStatus[] = ['none', 'sent', 'signed']
+
+function asDelivery(value: unknown): DeliveryStatus {
+  return DELIVERY.includes(value as DeliveryStatus) ? (value as DeliveryStatus) : 'pending'
+}
+
+function asContract(value: unknown): ContractStatus {
+  return CONTRACT.includes(value as ContractStatus) ? (value as ContractStatus) : 'none'
+}
+
 const LEGACY_STATUS: Record<string, LeadStatus> = {
   advance_pending: 'accepted',
 }
@@ -71,6 +105,13 @@ export function normalizeLead(raw: Lead): Lead {
     ...ev,
     timeline: ev.timeline ?? (ev.name === 'Wedding' ? defaultWeddingTimeline() : []),
   }))
+  const deliverables = (raw.deliverables || []).length ? raw.deliverables : defaultDeliverables()
+  const vendors: WeddingVendor[] = (raw.vendors || []).map((v) => ({
+    id: v.id || crypto.randomUUID(),
+    role: v.role || 'Planner',
+    name: v.name || '',
+    phone: v.phone || '',
+  }))
   return {
     ...raw,
     venue: raw.venue ?? '',
@@ -82,5 +123,21 @@ export function normalizeLead(raw: Lead): Lead {
       ...p,
       kind: LEGACY_KIND[p.kind] ?? p.kind,
     })),
+    vendors,
+    galleryDueOn: raw.galleryDueOn || '',
+    albumDueOn: raw.albumDueOn || '',
+    deliveryStatus: asDelivery(raw.deliveryStatus),
+    lostReason: raw.lostReason || '',
+    outstation: Boolean(raw.outstation),
+    travelFee: Number(raw.travelFee) || 0,
+    holdUntil: raw.holdUntil || '',
+    crewNotes: raw.crewNotes || '',
+    deliverables: deliverables.map((d) => ({
+      id: d.id || crypto.randomUUID(),
+      label: d.label || 'Deliverable',
+      done: Boolean(d.done),
+    })),
+    contractStatus: asContract(raw.contractStatus),
+    aftercareOn: raw.aftercareOn || '',
   }
 }

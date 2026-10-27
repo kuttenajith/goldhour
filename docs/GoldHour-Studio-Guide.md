@@ -43,7 +43,7 @@ Open the booked lead. Tick events (engagement, mehendi, wedding, reception). Fil
 | --- | --- | --- |
 | Trial | 14 days · ₹0 | Full desk |
 | Studio | ₹999 / month | Leads, PDF quotes, follow-ups, couple payments, checklist |
-| Studio Pro | ₹1,500 / month | Calendar (date clashes), pipeline, Pulse, WhatsApp drafts, Padmavathi, morning briefing |
+| Studio Pro | ₹1,499 / month | Calendar, date holds, pipeline, Pulse, crew, shot list, WhatsApp drafts, desk chatbot, morning briefing |
 
 Pay from **Plan** in the desk (UPI / GPay). The desk opens when Razorpay completes. If a month ends, leads stay saved; renew on the same screen.
 

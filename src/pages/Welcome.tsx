@@ -136,7 +136,7 @@ export function Welcome() {
                   setCity(v)
                   setErrors((p) => ({ ...p, city: v ? requiredText(v, 'the city') : '' }))
                 }}
-                placeholder="Madurai"
+                placeholder="Your city"
               />
             </Field>
           </div>

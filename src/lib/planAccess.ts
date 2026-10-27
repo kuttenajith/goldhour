@@ -45,15 +45,24 @@ export const STUDIO_FEATURES = [
   'Couple payments',
   'Follow-ups',
   'Event checklist on each lead',
+  'Vendors on the wedding',
+  'Gallery and album delivery dates',
+  'Outstation / travel fee',
+  'Lost-reason on the pipeline',
 ]
 
 export const PRO_FEATURES = [
   'Everything in Studio',
   'Wedding calendar with date-clash warnings',
+  'Date holds / pencil bookings',
   'Pipeline board (New → Booked)',
   'Pulse: win rate, source mix, quiet quotes',
   'Day-of timeline',
+  'Contract sent / signed status',
+  'Crew and second-shooter notes',
+  'Shot list / deliverables',
+  'Aftercare follow-up date',
   'WhatsApp desk templates',
-  'Padmavathi desk chatbot',
+  'Desk chatbot',
   'Pro notifications: clashes, stale quotes, morning briefing',
 ]

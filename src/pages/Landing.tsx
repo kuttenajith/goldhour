@@ -1,8 +1,23 @@
 import { Link } from 'react-router-dom'
-import { ArrowRight, Bell, CalendarClock, Columns3, FileText, IndianRupee, LayoutDashboard, MessageCircle, Users } from 'lucide-react'
+import {
+  ArrowRight,
+  Bell,
+  Briefcase,
+  CalendarClock,
+  ClipboardList,
+  Columns3,
+  FileText,
+  Images,
+  IndianRupee,
+  LayoutDashboard,
+  MessageCircle,
+  Users,
+} from 'lucide-react'
 import { BrandMark } from '../components/BrandMark.tsx'
 import { Button } from '../components/Button.tsx'
 import { SiteFooter } from '../components/SiteFooter.tsx'
+import { BILLING_PLANS } from '../lib/billingPlans.ts'
+import { PRO_FEATURES, STUDIO_FEATURES } from '../lib/planAccess.ts'
 import { asset } from '../lib/paths.ts'
 
 const suite = [
@@ -31,19 +46,34 @@ const suite = [
     photo: 'photos/reception.png',
   },
   {
+    icon: Briefcase,
+    title: 'Vendors',
+    copy: 'Planner, makeup, décor, venue coordinator on the same job file. Studio.',
+  },
+  {
+    icon: Images,
+    title: 'Deliveries',
+    copy: 'Gallery due, album due, sent or delivered. The post-wedding tray next to the booking. Studio.',
+  },
+  {
     icon: CalendarClock,
-    title: 'Wedding-day timeline',
-    copy: '06:00 getting ready through portraits. The beat sheet the second shooter can follow. Studio Pro.',
+    title: 'Calendar + holds',
+    copy: 'Date clashes and pencil bookings until a couple pays the advance. Studio Pro.',
+  },
+  {
+    icon: ClipboardList,
+    title: 'Shot list + crew',
+    copy: 'Teaser, highlight, album, gallery. Second-shooter notes. Agreement sent or signed. Studio Pro.',
   },
   {
     icon: Columns3,
     title: 'Pipeline + Pulse',
-    copy: 'New → quoted → booked on one board. Win rate, Instagram vs referral, quiet quotes, two Saturdays clashing.',
+    copy: 'New → quoted → booked on one board. Win rate, Instagram vs referral, quiet quotes. Studio Pro.',
   },
   {
     icon: LayoutDashboard,
     title: 'Desk chatbot',
-    copy: 'Padmavathi answers follow-ups, unpaid bookings, date clashes and this morning’s briefing. Studio Pro.',
+    copy: 'Follow-ups, unpaid bookings, date clashes and this morning’s briefing. Studio Pro.',
   },
   {
     icon: MessageCircle,
@@ -56,31 +86,22 @@ const prices = [
   {
     name: 'Trial',
     price: '₹0',
-    note: '14 days. Your own studio account, on the server.',
-    items: ['Leads and bookings', 'Quotations', 'Follow-ups', 'Payments', 'Pro extras for 14 days'],
+    note: '14 days. Your own studio account, on the server. Pro extras included.',
+    items: ['Full desk for 14 days', 'Then Studio or Pro'],
     featured: false,
   },
   {
-    name: 'Studio',
-    price: '₹999',
+    name: BILLING_PLANS.studio.name,
+    price: BILLING_PLANS.studio.label,
     note: 'The booking desk after the trial.',
-    items: ['Unlimited bookings', 'Quotations', 'Couple payments', 'Follow-ups', 'Event checklist'],
+    items: STUDIO_FEATURES,
     featured: true,
   },
   {
-    name: 'Studio Pro',
-    price: '₹1,500',
-    note: 'The full wedding CRM HQ can switch on for a studio.',
-    items: [
-      'Everything in Studio',
-      'Calendar + date-clash warnings',
-      'Pipeline board',
-      'Pulse reports',
-      'Day-of timeline',
-      'WhatsApp desk',
-      'Padmavathi chatbot',
-      'Morning briefing in the bell',
-    ],
+    name: BILLING_PLANS.studio_pro.name,
+    price: BILLING_PLANS.studio_pro.label,
+    note: 'The wedding CRM layer: calendar, holds, pipeline, Pulse, crew, shot list, chatbot.',
+    items: PRO_FEATURES,
     featured: false,
   },
 ]
@@ -144,7 +165,7 @@ export function Landing() {
             <span className="block text-gold-soft">Built to run the booking.</span>
           </h1>
           <p className="mx-auto mt-6 max-w-xl text-base text-mute sm:text-lg">
-            Enquiry, quotation, follow-up, advance — then Pro adds calendar, pipeline, Pulse and the desk chatbot. Built for studios, not for brides.
+            Enquiry, quotation, follow-up, advance — then Pro adds calendar, holds, pipeline, Pulse and the desk chatbot. Built for studios anywhere, not for brides.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Link to="/signup">
@@ -192,7 +213,7 @@ export function Landing() {
               </Link>
             </div>
             <div className="grid gap-3">
-              <article className="rounded-3xl border border-line bg-ink-2 p-6">
+              <article className="gh-card rounded-3xl border border-line bg-ink-2 p-6">
                 <p className="text-xs uppercase tracking-[0.2em] text-mute">New leads</p>
                 {[
                   ['Priya Wedding', '₹1,20,000'],
@@ -205,7 +226,7 @@ export function Landing() {
                   </div>
                 ))}
               </article>
-              <article className="rounded-3xl border border-line bg-ink-2 p-6">
+              <article className="gh-card rounded-3xl border border-line bg-ink-2 p-6">
                 <p className="text-xs uppercase tracking-[0.2em] text-mute">Follow-ups</p>
                 {[
                   ['Rahul', 'Follow up in 2 days'],
@@ -229,13 +250,19 @@ export function Landing() {
           <h2 className="mt-4 max-w-2xl font-display text-4xl sm:text-5xl">Everything you need. In the order a wedding actually runs.</h2>
           <div className="mt-12 grid gap-5 md:grid-cols-2">
             {suite.map((item) => (
-              <article key={item.title} className="overflow-hidden rounded-3xl border border-line bg-ink">
+              <article key={item.title} className="gh-card overflow-hidden rounded-3xl border border-line bg-ink">
                 {item.photo ? (
-                  <img src={asset(item.photo)} alt="" className="h-44 w-full object-cover sm:h-52" />
+                  <div className="overflow-hidden">
+                    <img src={asset(item.photo)} alt="" className="h-44 w-full object-cover sm:h-52" />
+                  </div>
                 ) : null}
                 <div className="p-6">
-                  <item.icon className="text-gold" size={22} />
-                  <h3 className="mt-4 font-display text-3xl">{item.title}</h3>
+                  <div className="flex items-center gap-3">
+                    <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-gold/30 bg-gold/10">
+                      <item.icon className="text-gold" size={20} />
+                    </span>
+                    <h3 className="min-w-0 truncate font-display text-2xl leading-none sm:text-3xl">{item.title}</h3>
+                  </div>
                   <p className="mt-3 text-base leading-relaxed text-mute">{item.copy}</p>
                 </div>
               </article>
@@ -248,9 +275,9 @@ export function Landing() {
         <div className="mx-auto grid max-w-6xl gap-8 px-4 sm:grid-cols-4 sm:px-6">
           {[
             ['14 days', 'Free trial on your own account'],
-            ['₹999', 'Studio, billed monthly'],
-            ['₹1,500', 'Studio Pro, when you are ready'],
-            ['Madurai', 'Built for Tamil Nadu first'],
+            [BILLING_PLANS.studio.label, 'Studio, billed monthly'],
+            [BILLING_PLANS.studio_pro.label, 'Studio Pro, when you are ready'],
+            ['Worldwide', 'Any city. One desk for the booking.'],
           ].map(([k, v]) => (
             <div key={k}>
               <p className="font-display text-3xl text-gold-soft sm:text-4xl">{k}</p>
@@ -266,7 +293,7 @@ export function Landing() {
           <h2 className="mt-4 max-w-2xl font-display text-4xl sm:text-5xl">Mehendi to reception. One couple at a time.</h2>
           <div className="mt-10 grid grid-cols-2 gap-3 md:grid-cols-4">
             {verticals.map(([src, label]) => (
-              <figure key={label} className="relative overflow-hidden rounded-2xl">
+              <figure key={label} className="gh-card relative overflow-hidden rounded-2xl">
                 <img src={asset(src)} alt={label} className="aspect-[3/4] w-full object-cover" />
                 <figcaption className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink to-transparent px-3 pb-4 pt-10 text-sm font-semibold uppercase tracking-[0.08em]">
                   {label}
@@ -282,13 +309,13 @@ export function Landing() {
           <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-gold">Pricing</p>
           <h2 className="mt-4 font-display text-4xl sm:text-5xl">Fourteen days free. Then the studio pays.</h2>
           <p className="mt-4 max-w-xl text-mute">
-            Create an account, run real bookings, pay ₹999 / month when the trial ends. Studio Pro is ₹1,500 for calendar, pipeline, Pulse and Padmavathi.
+            Create an account, run real bookings, pay {BILLING_PLANS.studio.label} / month when the trial ends. Studio Pro is {BILLING_PLANS.studio_pro.label} for calendar, holds, pipeline, Pulse and the desk chatbot.
           </p>
           <div className="mt-12 grid gap-5 lg:grid-cols-3">
             {prices.map((p) => (
               <article
                 key={p.name}
-                className={p.featured ? 'rounded-3xl bg-gold p-8 text-ink' : 'rounded-3xl border border-line bg-ink p-8'}
+                className={p.featured ? 'gh-card rounded-3xl bg-gold p-8 text-ink' : 'gh-card rounded-3xl border border-line bg-ink p-8'}
               >
                 <p className="text-xs uppercase tracking-[0.22em] opacity-70">{p.name}</p>
                 <p className="mt-3 font-display text-5xl tabular-nums">
@@ -311,11 +338,11 @@ export function Landing() {
       </section>
 
       <section id="start" className="relative z-10 bg-ink/70 px-4 py-20 backdrop-blur-md sm:px-6 sm:py-24">
-        <div className="mx-auto max-w-6xl overflow-hidden rounded-[2rem] border border-line">
+        <div className="gh-card mx-auto max-w-6xl overflow-hidden rounded-[2rem] border border-line">
           <div className="grid lg:grid-cols-2">
             <div className="flex flex-col justify-center bg-ink-2 p-8 sm:p-12">
               <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-gold">Start today</p>
-              <h2 className="mt-4 font-display text-4xl sm:text-5xl">Madurai first. Then the rest of Tamil Nadu.</h2>
+              <h2 className="mt-4 font-display text-4xl sm:text-5xl">Any city. One desk for the booking.</h2>
               <p className="mt-5 text-mute">
                 Open a desk, save a real enquiry, send a quotation. Upgrade when the trial still earns its morning.
               </p>

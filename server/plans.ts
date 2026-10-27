@@ -1,23 +1,10 @@
+import { BILLING_PLANS, type PaidPlanId } from '../src/lib/billingPlans.ts'
+
 export const TRIAL_DAYS = 14
 
-export const PLANS = {
-  studio: {
-    id: 'studio' as const,
-    name: 'Studio',
-    amountPaise: 99900,
-    days: 30,
-    label: '₹999',
-  },
-  studio_pro: {
-    id: 'studio_pro' as const,
-    name: 'Studio Pro',
-    amountPaise: 150000,
-    days: 30,
-    label: '₹1,500',
-  },
-}
+export const PLANS = BILLING_PLANS
 
-export type PaidPlanId = keyof typeof PLANS
+export type { PaidPlanId }
 
 export function todayIso() {
   return new Date().toISOString().slice(0, 10)

@@ -9,6 +9,8 @@ import { firstName } from '../lib/copilot.ts'
 import { api, acceptSession, useStudio } from '../lib/store.ts'
 import { useSignOut } from '../lib/useSignOut.ts'
 import { UserHello } from '../components/UserHello.tsx'
+import { BILLING_PLANS } from '../lib/billingPlans.ts'
+import { PRO_FEATURES, STUDIO_FEATURES } from '../lib/planAccess.ts'
 import type { StudioSnapshot } from '../lib/types.ts'
 
 declare global {
@@ -19,27 +21,18 @@ declare global {
 
 const plans = [
   {
-    id: 'studio',
-    name: 'Studio',
-    price: '₹999',
-    note: 'The booking desk: leads, quotes, follow-ups and couple payments.',
-    items: ['Unlimited leads and bookings', 'Quotations as PDF', 'Couple payments', 'Follow-ups', 'Event checklist'],
+    id: BILLING_PLANS.studio.id,
+    name: BILLING_PLANS.studio.name,
+    price: BILLING_PLANS.studio.label,
+    note: 'The booking desk: leads, quotes, follow-ups, couple payments, vendors and deliveries.',
+    items: STUDIO_FEATURES,
   },
   {
-    id: 'studio_pro',
-    name: 'Studio Pro',
-    price: '₹1,500',
-    note: 'Studio plus the CRM layer: calendar, pipeline, Pulse, chatbot, WhatsApp desk.',
-    items: [
-      'Everything in Studio',
-      'Wedding calendar + date clashes',
-      'Pipeline board',
-      'Pulse reports',
-      'Day-of timeline',
-      'WhatsApp templates',
-      'Padmavathi chatbot',
-      'Morning briefing in the bell',
-    ],
+    id: BILLING_PLANS.studio_pro.id,
+    name: BILLING_PLANS.studio_pro.name,
+    price: BILLING_PLANS.studio_pro.label,
+    note: 'Studio plus the CRM layer: calendar, holds, pipeline, Pulse, crew, shot list, chatbot, WhatsApp desk.',
+    items: PRO_FEATURES,
   },
 ]
 
@@ -177,7 +170,7 @@ export function Billing() {
         ) : null}
         <div className="mt-10 grid gap-4 md:grid-cols-2">
           {plans.map((p) => (
-            <article key={p.id} className="rounded-3xl border border-line bg-ink-2 p-6">
+            <article key={p.id} className="gh-card rounded-3xl border border-line bg-ink-2 p-6">
               <p className="text-sm font-semibold uppercase tracking-[0.08em] text-mute">{p.name}</p>
               <p className="mt-3 font-display text-5xl tabular-nums">
                 {p.price}

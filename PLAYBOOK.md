@@ -30,7 +30,7 @@ Mix:
 - 1 small studio
 - 1 established wedding team
 
-Where: Instagram (`Madurai wedding photographer`), Facebook groups, Google Maps, WhatsApp business groups, local exhibitions.
+Where: Instagram (`wedding photographer`), Facebook groups, Google Maps, WhatsApp business groups, local exhibitions.
 
 Send: https://goldhour-chi.vercel.app — they create their own studio (14-day trial) or open the demo with PIN `2026`.
 

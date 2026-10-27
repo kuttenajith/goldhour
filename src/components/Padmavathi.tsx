@@ -132,7 +132,7 @@ export function Padmavathi() {
                 <button
                   key={chip}
                   type="button"
-                  className="rounded-full border border-line px-2.5 py-1 text-[11px] text-mute hover:text-cream"
+                  className="gh-btn rounded-full border border-line px-2.5 py-1 text-[11px] text-mute hover:border-gold/50 hover:text-cream"
                   onClick={() => send(chip)}
                 >
                   {chip}
@@ -146,7 +146,7 @@ export function Padmavathi() {
                 onChange={(e) => setAsk(e.target.value)}
                 placeholder="Ask the desk chatbot…"
               />
-              <button type="submit" className="shrink-0 rounded-full bg-gold px-4 py-2 text-sm text-ink">
+              <button type="submit" className="gh-btn shrink-0 rounded-full bg-gold px-4 py-2 text-sm text-ink hover:bg-gold-soft">
                 Ask
               </button>
             </form>

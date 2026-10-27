@@ -22,7 +22,7 @@ export function trialWelcomeLetter(opts: {
       '• follow up in 2 days, then 5 if they go quiet',
       '• take the advance before you block the Saturday',
       '',
-      `Trial until ${opts.trialEndsOn}. After that, Studio is ₹999 / month. Studio Pro is ₹1,500 — calendar, pipeline, Pulse, WhatsApp desk and Padmavathi the chatbot. Same desk. Your couples stay on the server, not in this browser.`,
+      `Trial until ${opts.trialEndsOn}. After that, Studio is ₹999 / month. Studio Pro is ₹1,499 — calendar, holds, pipeline, Pulse, WhatsApp desk and the desk chatbot. Same desk. Your couples stay on the server, not in this browser.`,
       '',
       'Confirm this email (so we know the studio is real):',
       opts.verifyUrl,
@@ -35,7 +35,7 @@ export function trialWelcomeLetter(opts: {
       '',
       'The photographers who keep the desk open are the ones whose Saturdays are already booked.',
       '',
-      '— GoldHour, Madurai',
+      '— GoldHour',
     ].join('\n'),
   }
 }
@@ -44,12 +44,12 @@ export function demoFollowLetter() {
   return {
     subject: 'You just walked the GoldHour desk — keep it for ₹999 / month',
     text: [
-      'You opened the GoldHour demo — Meenakshi Frames, the Madurai wedding desk.',
+      'You opened the GoldHour demo — a sample wedding desk with real bookings on it.',
       '',
       'Priya’s booking, the quotation PDF, the follow-up in two days, the advance before the mandap — that is not a slideshow. That is the work that currently lives in WhatsApp and gets lost on a Friday night.',
       '',
       'Your own studio gets the same desk for 14 days. Free. No card.',
-      'Then ₹999 / month for Studio, or ₹1,500 for Studio Pro — calendar, pipeline, Pulse reports and the desk chatbot.',
+      'Then ₹999 / month for Studio, or ₹1,499 for Studio Pro — calendar, holds, pipeline, Pulse reports and the desk chatbot.',
       '',
       'Start your trial (two minutes):',
       `${APP_URL}/signup`,

@@ -22,6 +22,7 @@ import { FollowUps } from './pages/FollowUps.tsx'
 import { Quotations } from './pages/Quotations.tsx'
 import { Payments } from './pages/Payments.tsx'
 import { Bookings } from './pages/Bookings.tsx'
+import { Deliveries } from './pages/Deliveries.tsx'
 import { ConfirmProvider } from './components/ConfirmDialog.tsx'
 import { bootSession } from './lib/store.ts'
 
@@ -65,6 +66,7 @@ export function App() {
             <Route path="follow-ups" element={<FollowUps />} />
             <Route path="quotations" element={<Quotations />} />
             <Route path="payments" element={<Payments />} />
+            <Route path="deliveries" element={<Deliveries />} />
             <Route path="activity" element={<Activity />} />
           </Route>
         </Route>

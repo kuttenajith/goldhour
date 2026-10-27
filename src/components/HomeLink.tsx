@@ -6,7 +6,7 @@ export function HomeLink({ className }: { className?: string }) {
     <Link
       to="/"
       className={clsx(
-        'inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-gold/35 bg-transparent px-5 text-sm tracking-wide text-gold-soft transition hover:border-gold hover:text-cream',
+        'gh-btn inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-gold/35 bg-transparent px-5 text-sm tracking-wide text-gold-soft hover:border-gold hover:bg-gold/10 hover:text-cream',
         className,
       )}
     >

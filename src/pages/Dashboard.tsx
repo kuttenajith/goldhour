@@ -58,7 +58,7 @@ export function Dashboard() {
           ['Collected', money(collected)],
           ['Outstanding', money(outstanding)],
         ].map(([k, v]) => (
-          <article key={k} className="rounded-2xl border border-line bg-ink-2 p-4">
+          <article key={k} className="gh-card rounded-2xl border border-line bg-ink-2 p-4">
             <p className="text-[11px] uppercase tracking-[0.16em] text-mute">{k}</p>
             <p className="mt-2 font-display text-2xl tabular-nums text-gold-soft sm:text-3xl">{v}</p>
           </article>
@@ -72,7 +72,7 @@ export function Dashboard() {
             ['Date clashes', String(clashes)],
             ['Quiet quotes', String(quiet)],
           ].map(([k, v]) => (
-            <article key={k} className="rounded-2xl border border-gold/35 bg-ink-2 p-4">
+            <article key={k} className="gh-card rounded-2xl border border-gold/35 bg-ink-2 p-4">
               <p className="text-[11px] uppercase tracking-[0.16em] text-mute">{k}</p>
               <p className="mt-2 font-display text-2xl tabular-nums text-gold-soft sm:text-3xl">{v}</p>
             </article>
@@ -81,9 +81,9 @@ export function Dashboard() {
       ) : (
         <Link
           to="/studio/billing"
-          className="block rounded-2xl border border-gold/35 bg-gold/8 px-4 py-3 text-sm text-gold-soft"
+          className="gh-card block rounded-2xl border border-gold/35 bg-gold/8 px-4 py-3 text-sm text-gold-soft"
         >
-          Studio Pro adds Pulse, pipeline, calendar clashes and Padmavathi the desk chatbot.
+          Studio Pro adds Pulse, pipeline, date holds, shot list and the desk chatbot.
         </Link>
       )}
 

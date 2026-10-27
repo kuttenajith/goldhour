@@ -120,7 +120,7 @@ export function StudioLogin() {
           </div>
         ) : null}
         <p className="mt-3 max-w-md text-mute">
-          Sign in with Google, or email. Open the Madurai demo with PIN{' '}
+          Sign in with Google, or email. Open the sample demo with PIN{' '}
           <span className="text-gold-soft">2026</span>.
         </p>
         <div className="mt-10 max-w-sm">
@@ -172,7 +172,7 @@ export function StudioLogin() {
           </Link>
         </p>
         <form onSubmit={openDemo} className="mt-10 max-w-sm space-y-3 border-t border-line pt-8" noValidate>
-          <p className="text-sm text-mute">Walk the Madurai demo. Leave your email and we’ll send the 14-day trial offer.</p>
+          <p className="text-sm text-mute">Walk the sample demo desk. Leave your email and we’ll send the 14-day trial offer.</p>
           <Field label="Demo PIN" error={pinHint} required>
             <input
               className={fieldBox(pinHint)}

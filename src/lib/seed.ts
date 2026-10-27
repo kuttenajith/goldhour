@@ -1,23 +1,29 @@
-import { defaultEvents, defaultWeddingTimeline, splitPlan } from './booking.ts'
+import { defaultEvents, defaultWeddingTimeline, normalizeLead, splitPlan } from './booking.ts'
 import { id } from './ids.ts'
 import { addDays, todayIso } from './format.ts'
 import type { Lead, Quotation, StudioState } from './types.ts'
 
-function lead(
-  partial: Omit<Lead, 'id' | 'createdOn' | 'plan' | 'venue'> & {
-    createdOn?: string
-    venue?: string
-    plan?: Lead['plan']
-  },
-): Lead {
+function lead(partial: Partial<Lead> & Pick<Lead, 'coupleName' | 'phone' | 'eventDate' | 'budget' | 'service' | 'source' | 'status' | 'packageAmount' | 'city' | 'notes' | 'nextAction' | 'nextActionOn' | 'events' | 'payments'>): Lead {
   const packageAmount = partial.packageAmount || partial.budget || 0
-  return {
+  return normalizeLead({
     id: id(),
     createdOn: partial.createdOn ?? '2026-08-12',
-    ...partial,
     venue: partial.venue ?? '',
     plan: partial.plan ?? splitPlan(packageAmount),
-  }
+    vendors: [],
+    galleryDueOn: '',
+    albumDueOn: '',
+    deliveryStatus: 'pending',
+    lostReason: '',
+    outstation: false,
+    travelFee: 0,
+    holdUntil: '',
+    crewNotes: '',
+    deliverables: [],
+    contractStatus: 'none',
+    aftercareOn: '',
+    ...partial,
+  })
 }
 
 export const DEMO_PIN = '2026'
@@ -36,6 +42,9 @@ export function seedState(): StudioState {
     status: 'booked',
     packageAmount: 120000,
     city: 'Madurai',
+    galleryDueOn: '2027-01-20',
+    albumDueOn: '2027-02-20',
+    crewNotes: 'Second shooter on two bodies. Call 05:30 at the hotel.',
     notes: 'Run this wedding end-to-end. Advance is in. Plan the day, collect the rest, shoot.',
     nextAction: 'Lock the 20 Dec timeline with the family',
     nextActionOn: today,

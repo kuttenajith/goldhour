@@ -14,7 +14,7 @@ const steps = [
   {
     n: '02',
     title: 'Try the demo, or create your studio',
-    body: 'Demo: Log in → PIN 2026. That is Meenakshi Frames with sample couples. Your studio: Get started. Fastest path is Continue with Google (then studio name, your name, city). Or enter studio name, mobile OTP, email and password (8+ characters). You get 14 days free.',
+    body: 'Demo: Log in → PIN 2026. That is a sample studio with sample couples. Your studio: Get started. Fastest path is Continue with Google (then studio name, your name, city). Or enter studio name, mobile OTP, email and password (8+ characters). You get 14 days free.',
   },
   {
     n: '03',
@@ -74,7 +74,7 @@ export function Guide() {
         <p className="mt-4 max-w-xl text-mute">
           For wedding photographers. Not for brides. Save the enquiry, send the quote, collect the advance — then shoot.
         </p>
-        <p className="mt-2 text-sm text-gold-soft">goldhour-chi.vercel.app · 14-day trial · then ₹999 / ₹1,500 a month</p>
+        <p className="mt-2 text-sm text-gold-soft">goldhour-chi.vercel.app · 14-day trial · then ₹999 / ₹1,499 a month</p>
 
         <ol className="mt-12 space-y-8">
           {steps.map((step) => (
@@ -98,7 +98,7 @@ export function Guide() {
               <span className="text-cream">Studio · ₹999 / month.</span> Unlimited leads, PDF quotes, follow-ups, couple payments, event checklist.
             </li>
             <li>
-              <span className="text-cream">Studio Pro · ₹1,500 / month.</span> Calendar (date clashes), pipeline, Pulse, WhatsApp desk drafts, Padmavathi chatbot, morning briefing.
+              <span className="text-cream">Studio Pro · ₹1,499 / month.</span> Calendar, date holds, pipeline, Pulse, crew, shot list, WhatsApp desk, desk chatbot, morning briefing.
             </li>
           </ul>
           <p className="mt-4 text-sm text-mute">

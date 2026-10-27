@@ -34,8 +34,8 @@ GoldHour is **not** a client portal, album proofing tool, photo storage product,
 
 | Role | How they enter | What they get |
 | --- | --- | --- |
-| Wedding photographer / studio owner | `/signup` with Google, or Indian mobile OTP + password | 14-day trial of the full desk, then Studio ₹999 / month or Studio Pro ₹1,500 / month |
-| Demo visitor | `/login` → PIN `2026` | Meenakshi Frames (Madurai) sample desk. Stays free. Cannot subscribe. |
+| Wedding photographer / studio owner | `/signup` with Google, or Indian mobile OTP + password | 14-day trial of the full desk, then Studio ₹999 / month or Studio Pro ₹1,499 / month |
+| Demo visitor | `/login` → PIN `2026` | Sample studio desk. Stays free. Cannot subscribe. |
 | HQ / operator | `/login` with HQ email | `/admin` plus a personal desk. Stays free. Does not go through Razorpay. |
 
 One human = one studio account today. There is **no team RBAC** (editor / accountant) and no MFA. Google Sign-In is live when `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` are set on Vercel.
@@ -232,7 +232,7 @@ Hobby plan: keep function count low (nested `api/auth`, `api/billing`, `api/admi
 | `server/db.ts` | Store interface: Neon **or** JSON file. `migrate()` creates tables. |
 | `server/crypto.ts` | scrypt passwords, JWT secret, Razorpay HMAC, ids |
 | `server/otp.ts` | 2Factor SMS only (never AUTOGEN/VOICE). Optional Fast2SMS fallback |
-| `server/plans.ts` | Trial 14 days; Studio ₹999 / 30d; Pro ₹1,500 / 30d; `billingStatus()` |
+| `server/plans.ts` | Trial 14 days; Studio ₹999 / 30d; Pro ₹1,499 / 30d; `billingStatus()` |
 | `server/notify.ts` | HQ notices for join, leads, plan request, paid |
 | `server/notices.ts` | Bell composition (follow-ups, trial/period ending, expired, HQ inbox) |
 | `server/noticeMail.ts` | Persist HQ inbox; sequential mail so Vercel 10s timeout does not drop the bell |
@@ -313,7 +313,7 @@ PIN `2026` opens `demo@goldhour.app` with seeded couples (Priya & Arjun, Nisha, 
 | --- | --- | --- | --- |
 | Trial | ₹0 | 14 days from signup | Full desk **including Pro** |
 | Studio | ₹999 | 30 days | Leads, quotes, PDF, follow-ups, couple payments, checklists. **No** calendar / pipeline / Pulse / Padmavathi Pro notices |
-| Studio Pro | ₹1,500 | 30 days | Everything in Studio + calendar clashes, pipeline, Pulse, day-of timeline emphasis, WhatsApp templates, Padmavathi, Pro bells |
+| Studio Pro | ₹1,499 | 30 days | Everything in Studio + calendar, date holds, pipeline, Pulse, crew, shot list, day-of timeline, WhatsApp templates, desk chatbot, Pro bells |
 | HQ / Demo | ₹0 | Open-ended | Full desk |
 
 ### 9.2 `billingStatus` (server)
@@ -358,7 +358,7 @@ Renewal while still in period **extends** from the current `period_ends_on`. Ren
 
 | Actor | What happens |
 | --- | --- |
-| Photographer | Desk locks. Billing headline **Your month ended**. Buttons **Renew Studio · ₹999** and **Move to Pro · ₹1,500**. Data stays. |
+| Photographer | Desk locks. Billing headline **Your month ended**. Buttons **Renew Studio · ₹999** and **Move to Pro · ₹1,499**. Data stays. |
 | 5 days before end | Studio + HQ bells: plan ending. |
 | On end | HQ **Month ended** filter + sticky notice. |
 | They tap Renew / Pro | HQ **Asked · unpaid** until Razorpay succeeds, then **Paid**. |
@@ -372,7 +372,7 @@ Renewal while still in period **extends** from the current `period_ends_on`. Ren
 | Orders | REST `POST https://api.razorpay.com/v1/orders` with Basic auth Key ID + Secret |
 | Confirm | HMAC-SHA256 `order_id|payment_id` with **key secret** |
 | Webhook (optional) | `POST https://goldhour-chi.vercel.app/api/billing/webhook` event **`payment.captured`**. Secret header `x-razorpay-signature`. **Do not** use `/api/api/billing/webhook`. |
-| Amounts | Integer **paise** (`99900`, `150000`) |
+| Amounts | Integer **paise** (`99900`, `149900`) |
 | Test vs live | `rzp_test_…` on Vercel now. Swap to `rzp_live_…` for real money. Never commit keys. |
 
 Without Key ID/Secret, checkout still records an HQ **request** and tells the photographer HQ can grant the plan.

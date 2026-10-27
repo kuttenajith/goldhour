@@ -48,6 +48,22 @@ export interface Payment {
   note: string
 }
 
+export type DeliveryStatus = 'pending' | 'gallery_sent' | 'album_delivered'
+export type ContractStatus = 'none' | 'sent' | 'signed'
+
+export interface WeddingVendor {
+  id: string
+  role: string
+  name: string
+  phone: string
+}
+
+export interface Deliverable {
+  id: string
+  label: string
+  done: boolean
+}
+
 export interface Quotation {
   id: string
   leadId: string
@@ -76,6 +92,18 @@ export interface Lead {
   nextAction: string
   nextActionOn: string
   createdOn: string
+  vendors: WeddingVendor[]
+  galleryDueOn: string
+  albumDueOn: string
+  deliveryStatus: DeliveryStatus
+  lostReason: string
+  outstation: boolean
+  travelFee: number
+  holdUntil: string
+  crewNotes: string
+  deliverables: Deliverable[]
+  contractStatus: ContractStatus
+  aftercareOn: string
 }
 
 export interface StudioProfile {

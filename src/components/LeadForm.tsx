@@ -40,6 +40,18 @@ function empty(): Lead {
     nextAction: 'Ask for date, venue and functions',
     nextActionOn: todayIso(),
     createdOn: todayIso(),
+    vendors: [],
+    galleryDueOn: '',
+    albumDueOn: '',
+    deliveryStatus: 'pending',
+    lostReason: '',
+    outstation: false,
+    travelFee: 0,
+    holdUntil: '',
+    crewNotes: '',
+    deliverables: [],
+    contractStatus: 'none',
+    aftercareOn: '',
   }
 }
 
@@ -168,7 +180,7 @@ export function LeadForm({
             setLead({ ...lead, city })
             setErrors((prev) => ({ ...prev, city: city ? requiredText(city, 'the city') : '' }))
           }}
-          placeholder="Madurai"
+          placeholder="Your city"
           maxLength={60}
         />
       </Field>
@@ -201,8 +213,8 @@ export function LeadForm({
                 onClick={() => toggleFunction(name)}
                 className={
                   on
-                    ? 'min-h-10 cursor-pointer rounded-full bg-gold px-3 py-1.5 text-sm text-ink'
-                    : 'min-h-10 cursor-pointer rounded-full border border-line px-3 py-1.5 text-sm text-mute'
+                    ? 'gh-btn min-h-10 cursor-pointer rounded-full bg-gold px-3 py-1.5 text-sm text-ink hover:bg-gold-soft'
+                    : 'gh-btn min-h-10 cursor-pointer rounded-full border border-line px-3 py-1.5 text-sm text-mute hover:border-gold/50 hover:text-cream'
                 }
               >
                 {name}

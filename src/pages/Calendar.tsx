@@ -49,7 +49,7 @@ export function Calendar() {
   const byDate = useMemo(() => {
     const map = new Map<string, typeof leads>()
     for (const lead of leads) {
-      const dates = [lead.eventDate, ...lead.events.map((ev) => ev.date)].filter(Boolean)
+      const dates = [lead.eventDate, ...lead.events.map((ev) => ev.date), lead.holdUntil].filter(Boolean)
       for (const date of dates) {
         const list = map.get(date) || []
         if (!list.some((l) => l.id === lead.id)) list.push(lead)
@@ -68,10 +68,10 @@ export function Calendar() {
         hint="Booked Saturdays on one month. GoldHour flags two couples on the same date so you do not double-book the crew."
         actions={
           <div className="flex gap-2">
-            <button type="button" className="rounded-full border border-line px-3 py-1.5 text-sm text-mute" onClick={() => setCursor((c) => ({ y: c.m === 0 ? c.y - 1 : c.y, m: c.m === 0 ? 11 : c.m - 1 }))}>
+            <button type="button" className="gh-btn rounded-full border border-line px-3 py-1.5 text-sm text-mute hover:border-gold/50 hover:text-cream" onClick={() => setCursor((c) => ({ y: c.m === 0 ? c.y - 1 : c.y, m: c.m === 0 ? 11 : c.m - 1 }))}>
               Prev
             </button>
-            <button type="button" className="rounded-full border border-line px-3 py-1.5 text-sm text-mute" onClick={() => setCursor((c) => ({ y: c.m === 11 ? c.y + 1 : c.y, m: c.m === 11 ? 0 : c.m + 1 }))}>
+            <button type="button" className="gh-btn rounded-full border border-line px-3 py-1.5 text-sm text-mute hover:border-gold/50 hover:text-cream" onClick={() => setCursor((c) => ({ y: c.m === 11 ? c.y + 1 : c.y, m: c.m === 11 ? 0 : c.m + 1 }))}>
               Next
             </button>
           </div>
@@ -106,6 +106,7 @@ export function Calendar() {
                     {events.slice(0, 2).map((l) => (
                       <li key={l.id}>
                         <Link to={`/studio/leads/${l.id}`} className="block truncate text-[11px] text-gold-soft">
+                          {l.holdUntil === key ? 'Hold · ' : ''}
                           {l.coupleName.split('&')[0].trim()}
                         </Link>
                       </li>

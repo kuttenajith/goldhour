@@ -7,6 +7,7 @@ import { Field, fieldBox } from '../components/Field.tsx'
 import { DateField } from '../components/DateField.tsx'
 import { LeadForm } from '../components/LeadForm.tsx'
 import { useConfirm } from '../components/ConfirmDialog.tsx'
+import { ProCrmFile, ProCrmGate, StudioJobFile } from '../components/LeadCrm.tsx'
 import { Modal } from '../components/Modal.tsx'
 import { Pipeline } from '../components/Pipeline.tsx'
 import { StatusPill } from '../components/StatusPill.tsx'
@@ -44,6 +45,8 @@ export function LeadDetail() {
   const [editing, setEditing] = useState(false)
   const [payOpen, setPayOpen] = useState(false)
   const [quoteOpen, setQuoteOpen] = useState(false)
+  const [lostOpen, setLostOpen] = useState(false)
+  const [lostReason, setLostReason] = useState(lead?.lostReason || '')
   const confirm = useConfirm()
 
   useEffect(() => {
@@ -155,10 +158,33 @@ export function LeadDetail() {
         <Button tone="ghost" onClick={() => setPayOpen(true)}>
           Record payment
         </Button>
+        {lead.status === 'booked' ? (
+          <Button
+            tone="ghost"
+            onClick={() =>
+              void confirm({
+                title: `Mark ${lead.coupleName} completed?`,
+                body: 'The wedding is shot. Gallery and album stay on the job file.',
+                confirmLabel: 'Mark completed',
+                cancelLabel: 'Not yet',
+              }).then((ok) => {
+                if (!ok) return
+                patchLead(lead.id, { status: 'completed', nextAction: 'Deliver gallery and album', nextActionOn: todayIso() })
+              })
+            }
+          >
+            Mark completed
+          </Button>
+        ) : null}
+        {lead.status !== 'lost' && lead.status !== 'completed' ? (
+          <Button tone="ghost" onClick={() => setLostOpen(true)}>
+            Mark lost
+          </Button>
+        ) : null}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-        <article className="rounded-3xl border border-line bg-ink-2 p-5 sm:p-6">
+        <article className="gh-card rounded-3xl border border-line bg-ink-2 p-5 sm:p-6">
           <p className="text-xs uppercase tracking-[0.22em] text-mute">Events</p>
           <ul className="mt-4 space-y-3">
             {lead.events.map((ev) => (
@@ -227,7 +253,7 @@ export function LeadDetail() {
 
         <div className="space-y-6">
           {hasProDesk(state) ? (
-            <article className="rounded-3xl border border-line bg-ink-2 p-5 sm:p-6">
+            <article className="gh-card rounded-3xl border border-line bg-ink-2 p-5 sm:p-6">
               <p className="text-xs uppercase tracking-[0.22em] text-mute">WhatsApp</p>
               <div className="mt-4 grid gap-2">
                 {lead.status === 'new' ? (
@@ -250,7 +276,7 @@ export function LeadDetail() {
               </div>
             </article>
           ) : (
-            <article className="rounded-3xl border border-gold/35 bg-ink-2 p-5 sm:p-6">
+            <article className="gh-card rounded-3xl border border-gold/35 bg-ink-2 p-5 sm:p-6">
               <p className="text-xs uppercase tracking-[0.22em] text-gold-soft">Studio Pro</p>
               <p className="mt-2 font-medium">WhatsApp desk</p>
               <p className="mt-2 text-sm text-mute">Templates to ask for date, send the quote, and remind for payment sit on Studio Pro.</p>
@@ -259,12 +285,15 @@ export function LeadDetail() {
               </Link>
             </article>
           )}
-          <article className="rounded-3xl border border-line bg-ink-2 p-5 sm:p-6">
+          <article className="gh-card rounded-3xl border border-line bg-ink-2 p-5 sm:p-6">
             <p className="text-xs uppercase tracking-[0.22em] text-mute">Notes</p>
             <p className="mt-3 text-sm leading-relaxed text-cream/80">{lead.notes || '—'}</p>
           </article>
         </div>
       </div>
+
+      <StudioJobFile lead={lead} />
+      {hasProDesk(state) ? <ProCrmFile lead={lead} /> : <ProCrmGate />}
 
       <PaymentBoard lead={lead} />
 
@@ -280,7 +309,7 @@ export function LeadDetail() {
             }
           />
         ) : (
-          <article className="rounded-3xl border border-gold/35 bg-ink-2 p-5 sm:p-6">
+          <article className="gh-card rounded-3xl border border-gold/35 bg-ink-2 p-5 sm:p-6">
             <p className="text-xs uppercase tracking-[0.22em] text-gold-soft">Studio Pro</p>
             <p className="mt-2 font-display text-2xl">Day-of timeline</p>
             <p className="mt-2 text-sm text-mute">Getting-ready through portraits lives on Studio Pro. Studio still runs the booking and payments.</p>
@@ -309,6 +338,47 @@ export function LeadDetail() {
       >
         Remove this lead
       </button>
+
+      {lostOpen ? (
+        <Modal title="Mark this enquiry lost" onClose={() => setLostOpen(false)}>
+          <Field label="Reason" hint="Price, date clash, went with another studio…">
+            <input
+              className={fieldBox()}
+              value={lostReason}
+              maxLength={160}
+              onChange={(e) => setLostReason(e.target.value.slice(0, 160))}
+              placeholder="Chose another studio"
+            />
+          </Field>
+          <div className="mt-5 flex justify-end gap-2">
+            <Button tone="ghost" onClick={() => setLostOpen(false)}>
+              Keep them
+            </Button>
+            <Button
+              onClick={() =>
+                void confirm({
+                  title: `Mark ${lead.coupleName} lost?`,
+                  body: lostReason.trim() || 'No reason saved. They leave the live pipeline.',
+                  confirmLabel: 'Mark lost',
+                  cancelLabel: 'Go back',
+                  danger: true,
+                }).then((ok) => {
+                  if (!ok) return
+                  patchLead(lead.id, {
+                    status: 'lost',
+                    lostReason: lostReason.trim(),
+                    nextAction: 'Lost — do not follow up',
+                    nextActionOn: todayIso(),
+                  })
+                  setLostOpen(false)
+                })
+              }
+            >
+              Mark lost
+            </Button>
+          </div>
+        </Modal>
+      ) : null}
 
       {editing ? (
         <Modal
@@ -418,7 +488,7 @@ function WaButton({ href, children }: { href: string; children: string }) {
       href={href}
       target="_blank"
       rel="noreferrer"
-      className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-full border border-gold/40 px-4 py-2.5 text-center text-sm text-gold-soft hover:border-gold hover:text-cream"
+      className="gh-btn inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-full border border-gold/40 px-4 py-2.5 text-center text-sm text-gold-soft hover:border-gold hover:text-cream"
     >
       <MessageCircle size={16} /> {children}
     </a>

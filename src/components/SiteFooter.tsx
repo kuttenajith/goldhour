@@ -8,7 +8,7 @@ export function SiteFooter() {
         <div>
           <BrandMark />
           <p className="mt-4 max-w-xs text-mute">
-            The studio desk for India’s wedding photographers — bookings on Studio, Pulse and the desk chatbot on Pro.
+            The studio desk for wedding photographers anywhere — bookings on Studio, Pulse and the desk chatbot on Pro.
           </p>
         </div>
         <div>
@@ -59,9 +59,9 @@ export function SiteFooter() {
         <div>
           <p className="text-xs uppercase tracking-[0.18em] text-gold-soft">GoldHour</p>
           <ul className="mt-4 space-y-2">
-            <li>Madurai</li>
+            <li>Studios worldwide</li>
             <li>₹999 / month Studio</li>
-            <li>₹1,500 / month Pro</li>
+            <li>₹1,499 / month Pro</li>
           </ul>
         </div>
       </div>
