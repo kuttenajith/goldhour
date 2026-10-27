@@ -49,7 +49,7 @@ export function LeadForm({
   onCancel,
 }: {
   initial?: Lead
-  onSave: (lead: Lead) => void
+  onSave: (lead: Lead) => void | Promise<void>
   onCancel: () => void
 }) {
   const [lead, setLead] = useState<Lead>(initial ?? empty())
@@ -90,7 +90,7 @@ export function LeadForm({
       date: ev.date || (ev.name === 'Wedding' ? lead.eventDate : ev.date),
     }))
     const packageAmount = lead.packageAmount || lead.budget
-    onSave({
+    void onSave({
       ...lead,
       events,
       packageAmount,

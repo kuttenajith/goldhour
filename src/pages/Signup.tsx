@@ -4,6 +4,8 @@ import { Link, useNavigate } from 'react-router-dom'
 import { BrandMark } from '../components/BrandMark.tsx'
 import { Button } from '../components/Button.tsx'
 import { GoogleButton } from '../components/GoogleButton.tsx'
+import { HomeLink } from '../components/HomeLink.tsx'
+import { useConfirm } from '../components/ConfirmDialog.tsx'
 import { Field, fieldBox } from '../components/Field.tsx'
 import { acceptSession, api, homeAfterAuth } from '../lib/store.ts'
 import {
@@ -19,6 +21,7 @@ import type { StudioSnapshot } from '../lib/types.ts'
 
 export function Signup() {
   const navigate = useNavigate()
+  const confirm = useConfirm()
   const [studioName, setStudioName] = useState('')
   const [owner, setOwner] = useState('')
   const [city, setCity] = useState('')
@@ -94,6 +97,13 @@ export function Signup() {
     e.preventDefault()
     setError('')
     if (!validate()) return
+    const ok = await confirm({
+      title: 'Open this studio desk?',
+      body: `Start a 14-day trial for ${studioName.trim()} in ${city.trim()}. We will text the OTP-confirmed mobile, never call it.`,
+      confirmLabel: 'Create studio',
+      cancelLabel: 'Go back',
+    })
+    if (!ok) return
     setBusy(true)
     try {
       const data = await api<StudioSnapshot>('/api/auth/register', {
@@ -113,6 +123,9 @@ export function Signup() {
     <div className="min-h-dvh overflow-x-clip bg-ink px-4 py-12 text-cream sm:px-6">
       <div className="mx-auto max-w-lg">
         <BrandMark />
+        <div className="mt-6">
+          <HomeLink />
+        </div>
         <h1 className="mt-10 font-display text-4xl sm:text-5xl">Start your studio desk</h1>
         <p className="mt-3 text-mute">
           14 days free. Continue with Google (no OTP), or fill the form and confirm your mobile. Then ₹999 / month for Studio, or ₹1,500 for Studio Pro.

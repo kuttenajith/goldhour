@@ -6,6 +6,7 @@ import { Button } from '../components/Button.tsx'
 import { Field, fieldBox } from '../components/Field.tsx'
 import { DateField } from '../components/DateField.tsx'
 import { LeadForm } from '../components/LeadForm.tsx'
+import { useConfirm } from '../components/ConfirmDialog.tsx'
 import { Modal } from '../components/Modal.tsx'
 import { Pipeline } from '../components/Pipeline.tsx'
 import { StatusPill } from '../components/StatusPill.tsx'
@@ -43,6 +44,7 @@ export function LeadDetail() {
   const [editing, setEditing] = useState(false)
   const [payOpen, setPayOpen] = useState(false)
   const [quoteOpen, setQuoteOpen] = useState(false)
+  const confirm = useConfirm()
 
   useEffect(() => {
     const open = params.get('open')
@@ -111,10 +113,18 @@ export function LeadDetail() {
           <Button
             tone="ghost"
             onClick={() =>
-              patchLead(lead.id, {
-                status: 'accepted',
-                nextAction: 'Collect advance and confirm booking',
-                nextActionOn: todayIso(),
+              void confirm({
+                title: `Mark ${lead.coupleName} accepted?`,
+                body: 'They agreed to the quote. Next: collect the advance and confirm the booking.',
+                confirmLabel: 'Mark accepted',
+                cancelLabel: 'Not yet',
+              }).then((ok) => {
+                if (!ok) return
+                patchLead(lead.id, {
+                  status: 'accepted',
+                  nextAction: 'Collect advance and confirm booking',
+                  nextActionOn: todayIso(),
+                })
               })
             }
           >
@@ -124,10 +134,18 @@ export function LeadDetail() {
         {canBook ? (
           <Button
             onClick={() =>
-              patchLead(lead.id, {
-                status: 'booked',
-                nextAction: 'Plan the wedding day',
-                nextActionOn: todayIso(),
+              void confirm({
+                title: `Book ${lead.coupleName}?`,
+                body: 'This date is taken on your desk. Plan the wedding day next.',
+                confirmLabel: 'Confirm booking',
+                cancelLabel: 'Not yet',
+              }).then((ok) => {
+                if (!ok) return
+                patchLead(lead.id, {
+                  status: 'booked',
+                  nextAction: 'Plan the wedding day',
+                  nextActionOn: todayIso(),
+                })
               })
             }
           >
@@ -148,10 +166,20 @@ export function LeadDetail() {
                 <button
                   type="button"
                   onClick={() =>
-                    patchLead(lead.id, {
-                      events: lead.events.map((item) =>
-                        item.id === ev.id ? { ...item, done: !item.done } : item,
-                      ),
+                    void confirm({
+                      title: ev.done ? `Unmark ${ev.name}?` : `Mark ${ev.name} done?`,
+                      body: ev.done
+                        ? 'This event goes back to pending on the wedding.'
+                        : `Tick ${ev.name} on ${lead.coupleName}’s wedding.`,
+                      confirmLabel: ev.done ? 'Unmark' : 'Mark done',
+                      cancelLabel: 'Leave it',
+                    }).then((ok) => {
+                      if (!ok) return
+                      patchLead(lead.id, {
+                        events: lead.events.map((item) =>
+                          item.id === ev.id ? { ...item, done: !item.done } : item,
+                        ),
+                      })
                     })
                   }
                   className="flex w-full cursor-pointer items-center justify-between rounded-2xl border border-line px-4 py-3 text-left hover:border-gold/40"
@@ -265,10 +293,19 @@ export function LeadDetail() {
 
       <button
         className="text-sm text-mute hover:text-orange-200"
-        onClick={() => {
-          removeLead(lead.id)
-          navigate('/studio/leads')
-        }}
+        onClick={() =>
+          void confirm({
+            title: `Remove ${lead.coupleName}?`,
+            body: 'The couple leaves the desk. Quotations for them go too. This cannot be undone from here.',
+            confirmLabel: 'Remove enquiry',
+            cancelLabel: 'Keep them',
+            danger: true,
+          }).then((ok) => {
+            if (!ok) return
+            removeLead(lead.id)
+            navigate('/studio/leads')
+          })
+        }
       >
         Remove this lead
       </button>
@@ -283,7 +320,14 @@ export function LeadDetail() {
         >
           <LeadForm
             initial={lead}
-            onSave={(next) => {
+            onSave={async (next) => {
+              const ok = await confirm({
+                title: 'Save these changes?',
+                body: `Update ${next.coupleName} on the desk.`,
+                confirmLabel: 'Save changes',
+                cancelLabel: 'Keep editing',
+              })
+              if (!ok) return
               upsertLead(next)
               setEditing(false)
               clearOpen()
@@ -302,7 +346,14 @@ export function LeadDetail() {
             setPayOpen(false)
             clearOpen()
           }}
-          onSave={(payment) => {
+          onSave={async (payment) => {
+            const ok = await confirm({
+              title: 'Record this payment?',
+              body: `Add it to ${lead.coupleName}. Outstanding on the desk will update.`,
+              confirmLabel: 'Save payment',
+              cancelLabel: 'Go back',
+            })
+            if (!ok) return
             addPayment(lead.id, payment)
             setPayOpen(false)
             clearOpen()
@@ -317,7 +368,14 @@ export function LeadDetail() {
             setQuoteOpen(false)
             clearOpen()
           }}
-          onSave={(packageName, amount, notes) => {
+          onSave={async (packageName, amount, notes) => {
+            const ok = await confirm({
+              title: 'Save this quotation?',
+              body: `${packageName} for ${lead.coupleName}. The PDF downloads after you confirm.`,
+              confirmLabel: 'Save quote',
+              cancelLabel: 'Keep editing',
+            })
+            if (!ok) return
             const quote = {
               id: id(),
               leadId: lead.id,
@@ -412,6 +470,7 @@ function TimelineBoard({
   slots: TimelineSlot[]
   onChange: (slots: TimelineSlot[]) => void
 }) {
+  const confirm = useConfirm()
   const ordered = [...slots].sort((a, b) => a.time.localeCompare(b.time))
 
   return (
@@ -424,7 +483,14 @@ function TimelineBoard({
         <Button
           tone="ghost"
           onClick={() =>
-            onChange([...slots, { id: id(), time: '18:00', title: 'New beat' }])
+            void confirm({
+              title: 'Add a beat?',
+              body: 'A new slot lands on the wedding-day timeline.',
+              confirmLabel: 'Add beat',
+              cancelLabel: 'Not now',
+            }).then((ok) => {
+              if (ok) onChange([...slots, { id: id(), time: '18:00', title: 'New beat' }])
+            })
           }
         >
           <Plus size={16} /> Add beat
@@ -451,7 +517,17 @@ function TimelineBoard({
             />
             <button
               className="cursor-pointer text-xs text-mute hover:text-cream"
-              onClick={() => onChange(slots.filter((s) => s.id !== slot.id))}
+              onClick={() =>
+                void confirm({
+                  title: 'Remove this beat?',
+                  body: slot.title ? `Take “${slot.title}” off the day plan.` : 'Take this slot off the day plan.',
+                  confirmLabel: 'Remove beat',
+                  cancelLabel: 'Keep it',
+                  danger: true,
+                }).then((ok) => {
+                  if (ok) onChange(slots.filter((s) => s.id !== slot.id))
+                })
+              }
             >
               Remove
             </button>
@@ -474,7 +550,7 @@ function PaymentModal({
   onSave,
 }: {
   onClose: () => void
-  onSave: (payment: Payment) => void
+  onSave: (payment: Payment) => void | Promise<void>
 }) {
   const [amount, setAmount] = useState('')
   const [kind, setKind] = useState<PaymentKind>('advance')
@@ -493,7 +569,7 @@ function PaymentModal({
     setError(msg || noteMsg)
     setDateHint(when)
     if (msg || noteMsg || when) return
-    onSave({
+    void onSave({
       id: id(),
       amount: Number(amount),
       kind,
@@ -573,7 +649,7 @@ function QuoteModal({
 }: {
   lead: Lead
   onClose: () => void
-  onSave: (packageName: string, amount: number, notes: string) => void
+  onSave: (packageName: string, amount: number, notes: string) => void | Promise<void>
 }) {
   const defaultName = useMemo(
     () =>
@@ -596,7 +672,7 @@ function QuoteModal({
     const noteMsg = requiredText(notes, 'notes for the PDF')
     setError(msg || pack || noteMsg)
     if (msg || pack || noteMsg) return
-    onSave(packageName, Number(amount), notes)
+    void onSave(packageName, Number(amount), notes)
   }
 
   return (

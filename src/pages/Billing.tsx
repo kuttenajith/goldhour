@@ -1,11 +1,13 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { BrandMark } from '../components/BrandMark.tsx'
 import { Button } from '../components/Button.tsx'
+import { useConfirm } from '../components/ConfirmDialog.tsx'
 import { NoticeBell } from '../components/NoticeBell.tsx'
 import { DeskSession } from '../components/TabGuard.tsx'
 import { firstName } from '../lib/copilot.ts'
-import { api, acceptSession, logoutStudio, useStudio } from '../lib/store.ts'
+import { api, acceptSession, useStudio } from '../lib/store.ts'
+import { useSignOut } from '../lib/useSignOut.ts'
 import { UserHello } from '../components/UserHello.tsx'
 import type { StudioSnapshot } from '../lib/types.ts'
 
@@ -80,7 +82,8 @@ function cta(planId: string, snap: StudioSnapshot) {
 
 export function Billing() {
   const snap = useStudio()
-  const navigate = useNavigate()
+  const confirm = useConfirm()
+  const signOut = useSignOut('/login')
   const [error, setError] = useState('')
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
@@ -88,6 +91,14 @@ export function Billing() {
   const renewAsk = asked && asked === snap.billing.plan && (asked === 'studio' || asked === 'studio_pro')
 
   async function pay(plan: string) {
+    const named = plans.find((p) => p.id === plan)?.name || 'this plan'
+    const ok = await confirm({
+      title: `Pay for ${named}?`,
+      body: 'Razorpay opens next. The desk stays saved if you cancel the payment.',
+      confirmLabel: 'Continue to pay',
+      cancelLabel: 'Not now',
+    })
+    if (!ok) return
     setError('')
     setNote('')
     setBusy(plan)
@@ -202,9 +213,7 @@ export function Billing() {
             <button
               type="button"
               className="text-gold-soft"
-              onClick={() => {
-                void logoutStudio().then(() => navigate('/login'))
-              }}
+              onClick={() => void signOut()}
             >
               Sign out
             </button>

@@ -33,7 +33,13 @@ function parseJson(body: string) {
 }
 
 function looksLikeVoice(body: string) {
-  return /voice|ivr|\bcall\b/i.test(body)
+  return /voice|ivr|\bcall\b|autogen/i.test(body)
+}
+
+function smsTemplate() {
+  const raw = (process.env.TWOFACTOR_SMS_TEMPLATE || 'OTP1').trim() || 'OTP1'
+  if (/autogen|voice|ivr|call/i.test(raw)) return 'OTP1'
+  return raw
 }
 
 function twoFactorSmsOk(body: string, httpOk: boolean) {
@@ -51,22 +57,21 @@ function twoFactorSmsOk(body: string, httpOk: boolean) {
   return true
 }
 
-/** SMS only. Never AUTOGEN/VOICE — those are the phone-call path. */
+/** SMS text only. Never AUTOGEN / VOICE — those place a phone call. Never send without a DLT template. */
 async function via2FactorSms(key: string, phone: string, code: string) {
-  const template = (process.env.TWOFACTOR_SMS_TEMPLATE || 'OTP1').trim() || 'OTP1'
+  const template = smsTemplate()
   const keyPart = encodeURIComponent(key)
   const otp = encodeURIComponent(code)
   const tpl = encodeURIComponent(template)
-  const numbers = [phone, `91${phone}`, `+91${phone}`]
-  const attempts: { url: string; method: 'POST' | 'GET' }[] = []
+  const numbers = [phone, `91${phone}`]
   for (const number of numbers) {
     const n = encodeURIComponent(number)
-    attempts.push({ url: `https://2factor.in/API/V1/${keyPart}/SMS/${n}/${otp}/${tpl}`, method: 'POST' })
-    attempts.push({ url: `https://2factor.in/API/V1/${keyPart}/SMS/${n}/${otp}`, method: 'POST' })
-  }
-  for (const { url, method } of attempts) {
-    const { ok, body } = await postJson(url, { method })
-    if (twoFactorSmsOk(body, ok)) return true
+    const url = `https://2factor.in/API/V1/${keyPart}/SMS/${n}/${otp}/${tpl}`
+    if (/autogen|voice|ivr/i.test(url)) continue
+    for (const method of ['POST', 'GET'] as const) {
+      const { ok, body } = await postJson(url, { method })
+      if (twoFactorSmsOk(body, ok)) return true
+    }
   }
   return false
 }
@@ -89,7 +94,6 @@ export async function sendPhoneOtp(opts: { phone: string; twoFactorKey: string; 
   if (opts.twoFactorKey) {
     const sms = await via2FactorSms(opts.twoFactorKey, mobile, code)
     if (sms) return { ok: true, code }
-    return { ok: false, reason: '2factor' }
   }
   if (opts.fast2smsKey) {
     const sent = await viaFast2Sms(
@@ -100,5 +104,6 @@ export async function sendPhoneOtp(opts: { phone: string; twoFactorKey: string; 
     if (sent) return { ok: true, code }
     return { ok: false, reason: 'fast2sms' }
   }
+  if (opts.twoFactorKey) return { ok: false, reason: '2factor' }
   return { ok: false, reason: 'no-provider' }
 }

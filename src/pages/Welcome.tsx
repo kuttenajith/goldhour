@@ -3,6 +3,8 @@ import type { FormEvent } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { BrandMark } from '../components/BrandMark.tsx'
 import { Button } from '../components/Button.tsx'
+import { useConfirm } from '../components/ConfirmDialog.tsx'
+import { HomeLink } from '../components/HomeLink.tsx'
 import { Field, fieldBox } from '../components/Field.tsx'
 import { acceptSession, api, homeAfterAuth, useSession } from '../lib/store.ts'
 import { nameError, onlyName, onlyPhone, phoneError, requiredText } from '../lib/input.ts'
@@ -12,6 +14,7 @@ import type { StudioSnapshot } from '../lib/types.ts'
 export function Welcome() {
   const session = useSession()
   const navigate = useNavigate()
+  const confirm = useConfirm()
   const data = session.status === 'in' ? session.data : null
   const [primed, setPrimed] = useState(false)
   const [studioName, setStudioName] = useState('')
@@ -53,6 +56,13 @@ export function Welcome() {
     e.preventDefault()
     setError('')
     if (!validate() || !data) return
+    const ok = await confirm({
+      title: 'Save this studio name?',
+      body: `${studioName.trim()} · ${owner.trim()} · ${city.trim()} will show on quotations and HQ notices.`,
+      confirmLabel: 'Save and open desk',
+      cancelLabel: 'Keep editing',
+    })
+    if (!ok) return
     setBusy(true)
     try {
       const next = await api<StudioSnapshot>('/api/studio', {
@@ -80,6 +90,9 @@ export function Welcome() {
     <div className="min-h-dvh overflow-x-clip bg-ink px-4 py-12 text-cream sm:px-6">
       <div className="mx-auto max-w-lg">
         <BrandMark />
+        <div className="mt-6">
+          <HomeLink />
+        </div>
         <h1 className="mt-10 font-display text-4xl sm:text-5xl">Name this studio</h1>
         <p className="mt-3 text-mute">
           Signed in as {session.data.email}. Add the desk name, your name, and city so quotations and HQ notices look right. Phone is optional.

@@ -8,6 +8,7 @@ import { PageHeader } from '../components/PageHeader.tsx'
 import { StatusPill } from '../components/StatusPill.tsx'
 import { fieldClass } from '../components/Field.tsx'
 import { day, money, SOURCE_LABEL } from '../lib/format.ts'
+import { useConfirm } from '../components/ConfirmDialog.tsx'
 import { upsertLead, useStudio } from '../lib/store.ts'
 import type { Lead } from '../lib/types.ts'
 
@@ -16,6 +17,7 @@ export function Leads() {
   const [params, setParams] = useSearchParams()
   const [q, setQ] = useState('')
   const [open, setOpen] = useState(false)
+  const confirm = useConfirm()
 
   useEffect(() => {
     if (params.get('new') === '1') setOpen(true)
@@ -38,7 +40,14 @@ export function Leads() {
     })
   }, [leads, q])
 
-  function save(lead: Lead) {
+  async function save(lead: Lead) {
+    const ok = await confirm({
+      title: 'Add this enquiry?',
+      body: `${lead.coupleName} will sit on the desk with ${lead.city || lead.venue || 'the venue still pending'}.`,
+      confirmLabel: 'Save enquiry',
+      cancelLabel: 'Keep editing',
+    })
+    if (!ok) return
     upsertLead(lead)
     closeForm()
   }

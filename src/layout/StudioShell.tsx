@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { Link, NavLink, Outlet } from 'react-router-dom'
 import {
   Bell,
   CalendarDays,
@@ -27,7 +27,8 @@ import { firstName } from '../lib/copilot.ts'
 import { todayIso } from '../lib/format.ts'
 import { readNavCollapsed, writeNavCollapsed } from '../lib/navCollapse.ts'
 import { planLabel } from '../lib/planAccess.ts'
-import { logoutStudio, useStudio } from '../lib/store.ts'
+import { useStudio } from '../lib/store.ts'
+import { useSignOut } from '../lib/useSignOut.ts'
 import { clsx } from '../lib/clsx.ts'
 
 const links: { to: string; label: string; icon: typeof LayoutDashboard; end?: boolean; pro?: boolean }[] = [
@@ -86,7 +87,6 @@ function DeskNav({
 export function StudioShell() {
   const snap = useStudio()
   const { studio, billing, isAdmin, leads } = snap
-  const navigate = useNavigate()
   const today = todayIso()
   const due = leads.filter(
     (l) => l.nextActionOn <= today && l.status !== 'completed' && l.status !== 'lost' && l.status !== 'booked',
@@ -109,10 +109,7 @@ export function StudioShell() {
     return () => document.removeEventListener('keydown', onKey)
   }, [menuOpen])
 
-  function signOut() {
-    logoutStudio()
-    navigate('/')
-  }
+  const signOut = useSignOut()
 
   return (
     <div className="relative h-dvh max-h-dvh overflow-hidden bg-ink text-cream">

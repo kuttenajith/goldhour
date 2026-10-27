@@ -38,7 +38,7 @@ export function DateField({
       <input
         ref={ref}
         type="date"
-        required={required}
+        required={false}
         min={min}
         max={max}
         value={value}

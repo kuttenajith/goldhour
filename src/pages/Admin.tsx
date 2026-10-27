@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Download, LogOut, Shield } from 'lucide-react'
 import { BrandMark } from '../components/BrandMark.tsx'
 import { NoticeBell } from '../components/NoticeBell.tsx'
@@ -10,7 +10,9 @@ import { fieldClass } from '../components/Field.tsx'
 import { day, money, paid, when, PAYMENT_LABEL, SERVICE_LABEL, SOURCE_LABEL } from '../lib/format.ts'
 import { firstName } from '../lib/copilot.ts'
 import { desksCsv, downloadText, leadsCsv, paymentsCsv, type HqExport } from '../lib/hqExport.ts'
-import { api, logoutStudio, useStudio } from '../lib/store.ts'
+import { useConfirm } from '../components/ConfirmDialog.tsx'
+import { api, useStudio } from '../lib/store.ts'
+import { useSignOut } from '../lib/useSignOut.ts'
 import { UserHello } from '../components/UserHello.tsx'
 import type { AdminOverview, AdminTenant, AppNotice, Lead } from '../lib/types.ts'
 import { clsx } from '../lib/clsx.ts'
@@ -111,6 +113,7 @@ function StudioCard({
   const [open, setOpen] = useState(Boolean(startsOpen) || Boolean(tenant.billing.requestedPlan) || moneyIn)
   const [planBusy, setPlanBusy] = useState<string | null>(null)
   const [deskBusy, setDeskBusy] = useState(false)
+  const confirm = useConfirm()
   useEffect(() => {
     if (startsOpen || tenant.billing.requestedPlan || moneyIn) setOpen(true)
   }, [startsOpen, tenant.billing.requestedPlan, moneyIn])
@@ -133,6 +136,14 @@ function StudioCard({
   const requested = tenant.billing.requestedPlan
 
   async function activate(plan: 'studio' | 'studio_pro') {
+    const label = plan === 'studio_pro' ? 'Studio Pro' : 'Studio'
+    const ok = await confirm({
+      title: `Switch ${tenant.studio.name} to ${label}?`,
+      body: `This updates their paid plan on the desk. They will see ${label} on the next refresh.`,
+      confirmLabel: `Yes, grant ${label}`,
+      cancelLabel: 'Keep current plan',
+    })
+    if (!ok) return
     setPlanBusy(plan)
     try {
       await api('/api/admin/activate-plan', { method: 'POST', body: JSON.stringify({ email: tenant.email, plan }) })
@@ -143,7 +154,14 @@ function StudioCard({
   }
 
   async function removeDesk() {
-    if (!window.confirm(`Remove ${tenant.studio.name}? The desk stays in the database. They cannot sign in.`)) return
+    const ok = await confirm({
+      title: `Remove ${tenant.studio.name}?`,
+      body: 'The desk stays in the database. They cannot sign in until you put it back.',
+      confirmLabel: 'Remove this desk',
+      cancelLabel: 'Keep it live',
+      danger: true,
+    })
+    if (!ok) return
     setDeskBusy(true)
     try {
       await api('/api/admin/remove-desk', { method: 'POST', body: JSON.stringify({ email: tenant.email }) })
@@ -154,6 +172,13 @@ function StudioCard({
   }
 
   async function restoreDesk() {
+    const ok = await confirm({
+      title: `Put ${tenant.studio.name} back?`,
+      body: 'They will be able to sign in again with the same email. Leads and quotes are still there.',
+      confirmLabel: 'Restore desk',
+      cancelLabel: 'Leave it removed',
+    })
+    if (!ok) return
     setDeskBusy(true)
     try {
       await api('/api/admin/restore-desk', { method: 'POST', body: JSON.stringify({ email: tenant.email }) })
@@ -311,7 +336,7 @@ function StudioCard({
 }
 
 export function Admin() {
-  const navigate = useNavigate()
+  const signOut = useSignOut()
   const me = useStudio()
   const [params] = useSearchParams()
   const focus = params.get('studio') || ''
@@ -471,10 +496,7 @@ export function Admin() {
           <button
             type="button"
             className="inline-flex items-center gap-2 text-mute hover:text-cream"
-            onClick={() => {
-              logoutStudio()
-              navigate('/')
-            }}
+            onClick={() => void signOut()}
           >
             <LogOut size={14} /> Leave
           </button>

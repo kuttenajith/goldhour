@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { ArrowRight, Download, Printer } from 'lucide-react'
 import { BrandMark } from '../components/BrandMark.tsx'
 import { Button } from '../components/Button.tsx'
+import { HomeLink } from '../components/HomeLink.tsx'
 import { asset } from '../lib/paths.ts'
 
 const steps = [
@@ -50,6 +51,7 @@ export function Guide() {
           <BrandMark />
         </Link>
         <div className="flex flex-wrap items-center gap-2">
+          <HomeLink className="min-h-9 px-3 text-xs sm:text-sm" />
           <a href={asset('GoldHour-Studio-Guide.pdf')} download>
             <Button tone="ghost" className="px-3 text-xs sm:text-sm">
               <Download size={14} /> PDF

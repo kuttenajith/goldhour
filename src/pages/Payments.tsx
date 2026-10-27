@@ -1,12 +1,14 @@
 import { Link } from 'react-router-dom'
 import { paidOf } from '../lib/booking.ts'
 import { money, paid } from '../lib/format.ts'
+import { useConfirm } from '../components/ConfirmDialog.tsx'
 import { resetDemo, useStudio } from '../lib/store.ts'
 import { Button } from '../components/Button.tsx'
 import { PageHeader } from '../components/PageHeader.tsx'
 
 export function Payments() {
   const { leads, isDemo } = useStudio()
+  const confirm = useConfirm()
   const rows = leads.filter((l) => l.packageAmount > 0)
 
   return (
@@ -16,7 +18,20 @@ export function Payments() {
         title="Payments"
         actions={
           isDemo ? (
-            <Button tone="ghost" onClick={resetDemo}>
+            <Button
+              tone="ghost"
+              onClick={() =>
+                void confirm({
+                  title: 'Reset the demo desk?',
+                  body: 'Sample couples come back. Anything you typed in this demo is wiped.',
+                  confirmLabel: 'Reset demo',
+                  cancelLabel: 'Keep it',
+                  danger: true,
+                }).then((ok) => {
+                  if (ok) resetDemo()
+                })
+              }
+            >
               Reset demo data
             </Button>
           ) : null

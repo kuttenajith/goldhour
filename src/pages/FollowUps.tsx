@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { addDays, day, todayIso } from '../lib/format.ts'
+import { useConfirm } from '../components/ConfirmDialog.tsx'
 import { setNextAction, useStudio } from '../lib/store.ts'
 import { Button } from '../components/Button.tsx'
 import { PageHeader } from '../components/PageHeader.tsx'
@@ -44,6 +45,7 @@ function Group({
   snoozeDays: number
   silent?: boolean
 }) {
+  const confirm = useConfirm()
   return (
     <section className="rounded-2xl border border-line bg-ink-2 p-4 sm:p-5">
       <h2 className="text-sm font-semibold text-cream">{title}</h2>
@@ -67,12 +69,22 @@ function Group({
                   tone="ghost"
                   className="px-3 py-1.5 text-xs"
                   onClick={() =>
-                    setNextAction(
-                      l.id,
-                      silent ? 'No response — follow up in 5 days' : `Follow up in ${snoozeDays} days`,
-                      addDays(todayIso(), snoozeDays),
-                      silent ? 'no_response' : 'follow_up',
-                    )
+                    void confirm({
+                      title: `Update ${l.coupleName}?`,
+                      body: silent
+                        ? 'Mark no response and follow up again in 5 days.'
+                        : `Snooze this follow-up by ${snoozeDays} days.`,
+                      confirmLabel: snoozeLabel,
+                      cancelLabel: 'Leave it',
+                    }).then((ok) => {
+                      if (!ok) return
+                      setNextAction(
+                        l.id,
+                        silent ? 'No response — follow up in 5 days' : `Follow up in ${snoozeDays} days`,
+                        addDays(todayIso(), snoozeDays),
+                        silent ? 'no_response' : 'follow_up',
+                      )
+                    })
                   }
                 >
                   {snoozeLabel}

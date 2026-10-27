@@ -4,6 +4,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { BrandMark } from '../components/BrandMark.tsx'
 import { Button } from '../components/Button.tsx'
 import { GoogleButton } from '../components/GoogleButton.tsx'
+import { HomeLink } from '../components/HomeLink.tsx'
 import { Field, fieldBox } from '../components/Field.tsx'
 import { acceptSession, api, homeAfterAuth } from '../lib/store.ts'
 import { emailError, onlyPhone } from '../lib/input.ts'
@@ -19,15 +20,15 @@ export function StudioLogin() {
     google === 'off'
       ? 'Google sign-in is not connected yet. Use email and password, or send HQ the Google Client ID and secret.'
       : google === 'denied'
-        ? 'Google sign-in was cancelled.'
+        ? 'Google sign-in was cancelled. Use Continue with Google again, or sign in with email.'
         : google === 'email'
-          ? 'Google did not share a verified email. Allow email access, or sign up with OTP.'
+          ? 'Google did not share a verified email. Allow email, or start a trial with OTP instead.'
           : google === 'removed'
-            ? 'This studio desk was removed. Contact GoldHour HQ.'
+            ? 'This studio desk was removed. Mail GoldHour HQ to put it back.'
             : google === 'busy'
-              ? 'Too many sign-in attempts. Wait 15 minutes.'
+              ? 'Too many sign-in attempts. Wait 15 minutes, then try again.'
               : google
-                ? 'Google sign-in failed. Try again, or use email and password.'
+                ? 'GoldHour could not finish Google sign-in. Try Continue with Google again, or use email and password.'
                 : ''
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -36,14 +37,18 @@ export function StudioLogin() {
   const [demoEmailHint, setDemoEmailHint] = useState('')
   const [error, setError] = useState('')
   const [emailHint, setEmailHint] = useState('')
+  const [passwordHint, setPasswordHint] = useState('')
+  const [pinHint, setPinHint] = useState('')
   const [busy, setBusy] = useState(false)
 
   async function submit(e: FormEvent) {
     e.preventDefault()
     const mail = emailError(email)
+    const pwd = password.trim() ? '' : 'Enter your password'
     setEmailHint(mail)
+    setPasswordHint(pwd)
     setError('')
-    if (mail) return
+    if (mail || pwd) return
     setBusy(true)
     try {
       const data = await api<StudioSnapshot>('/api/auth/login', {
@@ -62,9 +67,11 @@ export function StudioLogin() {
   async function openDemo(e: FormEvent) {
     e.preventDefault()
     const mailHint = demoEmail.trim() ? emailError(demoEmail) : ''
+    const pinMsg = pin.trim() ? '' : 'Enter the demo PIN'
     setDemoEmailHint(mailHint)
+    setPinHint(pinMsg)
     setError('')
-    if (mailHint) return
+    if (mailHint || pinMsg) return
     setBusy(true)
     try {
       const data = await api<StudioSnapshot>('/api/auth/demo', {
@@ -95,10 +102,23 @@ export function StudioLogin() {
       </div>
       <div className="flex flex-col justify-center bg-ink px-6 py-16 sm:px-16">
         <BrandMark sweep />
+        <div className="mt-6">
+          <HomeLink />
+        </div>
         <h1 className="mt-10 font-display text-4xl sm:text-5xl">Studio sign in</h1>
         {verify === 'ok' ? <p className="mt-3 text-sm text-gold-soft">Email confirmed. Sign in.</p> : null}
-        {verify === 'expired' ? <p className="mt-3 text-sm text-orange-200">That confirmation link expired.</p> : null}
-        {googleHint ? <p className="mt-3 text-sm text-orange-200">{googleHint}</p> : null}
+        {verify === 'expired' ? (
+          <div className="mt-4 rounded-2xl border border-gold/35 bg-ink-2 p-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gold-soft">GoldHour</p>
+            <p className="mt-2 text-sm text-cream">That confirmation link expired. Request a new one from Forgot password.</p>
+          </div>
+        ) : null}
+        {googleHint ? (
+          <div className="mt-4 rounded-2xl border border-gold/35 bg-ink-2 p-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gold-soft">GoldHour</p>
+            <p className="mt-2 text-sm text-cream">{googleHint}</p>
+          </div>
+        ) : null}
         <p className="mt-3 max-w-md text-mute">
           Sign in with Google, or email. Open the Madurai demo with PIN{' '}
           <span className="text-gold-soft">2026</span>.
@@ -107,10 +127,9 @@ export function StudioLogin() {
           <GoogleButton label="Continue with Google" />
           <p className="my-5 text-center text-xs uppercase tracking-[0.2em] text-mute">or email</p>
         </div>
-        <form onSubmit={submit} className="max-w-sm space-y-5">
+        <form onSubmit={submit} className="max-w-sm space-y-5" noValidate>
           <Field label="Email" error={emailHint} required>
             <input
-              required
               className={fieldBox(emailHint)}
               value={email}
               onChange={(e) => {
@@ -124,12 +143,14 @@ export function StudioLogin() {
               maxLength={120}
             />
           </Field>
-          <Field label="Password" required>
+          <Field label="Password" error={passwordHint} required>
             <input
-              required
-              className={fieldBox()}
+              className={fieldBox(passwordHint)}
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => {
+                setPassword(e.target.value)
+                setPasswordHint('')
+              }}
               type="password"
               autoComplete="current-password"
               maxLength={128}
@@ -150,14 +171,16 @@ export function StudioLogin() {
             Start a 14-day trial
           </Link>
         </p>
-        <form onSubmit={openDemo} className="mt-10 max-w-sm space-y-3 border-t border-line pt-8">
+        <form onSubmit={openDemo} className="mt-10 max-w-sm space-y-3 border-t border-line pt-8" noValidate>
           <p className="text-sm text-mute">Walk the Madurai demo. Leave your email and we’ll send the 14-day trial offer.</p>
-          <Field label="Demo PIN" required>
+          <Field label="Demo PIN" error={pinHint} required>
             <input
-              required
-              className={fieldBox()}
+              className={fieldBox(pinHint)}
               value={pin}
-              onChange={(e) => setPin(onlyPhone(e.target.value).replace('+', '').slice(0, 4))}
+              onChange={(e) => {
+                setPin(onlyPhone(e.target.value).replace('+', '').slice(0, 4))
+                setPinHint('')
+              }}
               placeholder="2026"
               inputMode="numeric"
               maxLength={4}

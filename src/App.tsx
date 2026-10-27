@@ -22,6 +22,7 @@ import { FollowUps } from './pages/FollowUps.tsx'
 import { Quotations } from './pages/Quotations.tsx'
 import { Payments } from './pages/Payments.tsx'
 import { Bookings } from './pages/Bookings.tsx'
+import { ConfirmProvider } from './components/ConfirmDialog.tsx'
 import { bootSession } from './lib/store.ts'
 
 bootSession()
@@ -35,6 +36,7 @@ function basename() {
 export function App() {
   return (
     <BrowserRouter basename={basename()}>
+      <ConfirmProvider>
       <VisitTracker />
       <TabGuard />
       <Padmavathi />
@@ -68,6 +70,7 @@ export function App() {
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </ConfirmProvider>
     </BrowserRouter>
   )
 }

@@ -3,11 +3,14 @@ import type { FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { BrandMark } from '../components/BrandMark.tsx'
 import { Button } from '../components/Button.tsx'
+import { useConfirm } from '../components/ConfirmDialog.tsx'
+import { HomeLink } from '../components/HomeLink.tsx'
 import { Field, fieldBox } from '../components/Field.tsx'
 import { api } from '../lib/store.ts'
 import { emailError, passwordError } from '../lib/input.ts'
 
 export function Forgot() {
+  const confirm = useConfirm()
   const [email, setEmail] = useState('')
   const [done, setDone] = useState(false)
   const [error, setError] = useState('')
@@ -20,6 +23,13 @@ export function Forgot() {
     setHint(mail)
     setError('')
     if (mail) return
+    const ok = await confirm({
+      title: 'Send a reset link?',
+      body: `If ${email} has a GoldHour studio, we mail a link. Check spam if it is slow.`,
+      confirmLabel: 'Send the link',
+      cancelLabel: 'Not now',
+    })
+    if (!ok) return
     setBusy(true)
     try {
       await api('/api/auth/forgot', { method: 'POST', body: JSON.stringify({ email }) })
@@ -35,12 +45,15 @@ export function Forgot() {
     <div className="page-rise min-h-screen bg-ink px-6 py-16 text-cream">
       <div className="mx-auto max-w-sm">
         <BrandMark sweep />
+        <div className="mt-6">
+          <HomeLink />
+        </div>
         <h1 className="mt-10 font-display text-4xl">Reset password</h1>
         <p className="mt-3 text-mute">We’ll send a link if this email has a GoldHour studio.</p>
         {done ? (
           <p className="mt-8 text-gold-soft">If that studio exists, the reset mail is on its way. Check spam.</p>
         ) : (
-          <form onSubmit={submit} className="mt-8 space-y-5">
+          <form onSubmit={submit} className="mt-8 space-y-5" noValidate>
             <Field label="Email" error={hint} required>
               <input
                 className={fieldBox(hint)}
@@ -51,7 +64,6 @@ export function Forgot() {
                   setEmail(v)
                   setHint(v.includes('@') ? emailError(v) : '')
                 }}
-                required
                 maxLength={120}
               />
             </Field>
@@ -72,6 +84,7 @@ export function Forgot() {
 }
 
 export function Reset() {
+  const confirm = useConfirm()
   const [params] = useSearchParams()
   const token = useMemo(() => params.get('token') || '', [params])
   const [password, setPassword] = useState('')
@@ -86,6 +99,13 @@ export function Reset() {
     setHint(pwd)
     setError('')
     if (pwd) return
+    const ok = await confirm({
+      title: 'Save this password?',
+      body: 'You will use it the next time you open this studio desk.',
+      confirmLabel: 'Save password',
+      cancelLabel: 'Keep editing',
+    })
+    if (!ok) return
     setBusy(true)
     try {
       await api('/api/auth/reset', { method: 'POST', body: JSON.stringify({ token, password }) })
@@ -101,6 +121,9 @@ export function Reset() {
     <div className="page-rise min-h-screen bg-ink px-6 py-16 text-cream">
       <div className="mx-auto max-w-sm">
         <BrandMark sweep />
+        <div className="mt-6">
+          <HomeLink />
+        </div>
         <h1 className="mt-10 font-display text-4xl">New password</h1>
         {done ? (
           <p className="mt-8 text-gold-soft">
@@ -110,7 +133,7 @@ export function Reset() {
             </Link>
           </p>
         ) : (
-          <form onSubmit={submit} className="mt-8 space-y-5">
+          <form onSubmit={submit} className="mt-8 space-y-5" noValidate>
             <Field label="New password (8+ characters)" error={hint} required>
               <input
                 className={fieldBox(hint)}
@@ -123,7 +146,6 @@ export function Reset() {
                 }}
                 minLength={8}
                 maxLength={128}
-                required
               />
             </Field>
             {error ? <p className="text-sm text-orange-200">{error}</p> : null}

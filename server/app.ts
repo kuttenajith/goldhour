@@ -423,7 +423,7 @@ app.post('/auth/otp-send', async (c) => {
   const fast2smsKey = (process.env.FAST2SMS_API_KEY || '').trim()
   const sent = await sendPhoneOtp({ phone: mobile, twoFactorKey, fast2smsKey })
   if (!sent.ok) {
-    return c.json({ error: 'Could not send SMS to this number. Check the number and tap Send OTP again.' }, 502)
+    return c.json({ error: 'Could not send the OTP as a text message. We never place a call. Check the number and tap Send OTP again.' }, 502)
   }
   const now = new Date()
   await db.putPhoneOtp({
