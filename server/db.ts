@@ -101,6 +101,24 @@ export type TenantPublic = {
   sub: SubRow | null
 }
 
+export const DESK_BACKUP_KIND = 'goldhour-desk-backup'
+
+export type DeskBackup = {
+  kind: typeof DESK_BACKUP_KIND
+  version: 1
+  exportedAt: string
+  users: UserRow[]
+  studios: StudioRow[]
+  subs: SubRow[]
+  orders: OrderRow[]
+}
+
+export function isDeskBackup(raw: unknown): raw is DeskBackup {
+  if (!raw || typeof raw !== 'object') return false
+  const row = raw as DeskBackup
+  return row.kind === DESK_BACKUP_KIND && row.version === 1 && Array.isArray(row.users) && Array.isArray(row.studios)
+}
+
 export type Store = {
   migrate(): Promise<void>
   findUserByEmail(email: string): Promise<UserRow | null>
@@ -139,6 +157,9 @@ export type Store = {
   putSetting(key: string, value: string): Promise<void>
   upsertHqNotice(notice: AppNotice): Promise<void>
   listHqNotices(): Promise<AppNotice[]>
+  ping(): Promise<void>
+  exportDesk(): Promise<DeskBackup>
+  importDesk(pack: DeskBackup): Promise<{ users: number; studios: number; orders: number }>
 }
 
 function mapUser(
@@ -212,6 +233,18 @@ function mapHqNotice(row: Partial<AppNotice> & { id: string }): AppNotice {
 function sliceDate(value: string | null | undefined) {
   if (!value) return null
   return String(value).slice(0, 10)
+}
+
+function packDesk(users: UserRow[], studios: StudioRow[], subs: SubRow[], orders: OrderRow[]): DeskBackup {
+  return {
+    kind: DESK_BACKUP_KIND,
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    users: users.map(mapUser),
+    studios,
+    subs: subs.map(mapSub),
+    orders: orders.map(mapOrder),
+  }
 }
 
 function emptyStudio(userId: string, profile: Partial<StudioProfile> & { name: string }): StudioRow {
@@ -556,6 +589,38 @@ function fileStore(path: string): Store {
         .map(mapHqNotice)
         .sort((a, b) => b.at.localeCompare(a.at))
         .slice(0, 200)
+    },
+    async ping() {
+      read()
+    },
+    async exportDesk() {
+      const db = read()
+      return packDesk(db.users, db.studios, db.subs, db.orders)
+    },
+    async importDesk(pack) {
+      const db = read()
+      for (const user of pack.users.map(mapUser)) {
+        const i = db.users.findIndex((row) => row.id === user.id || row.email === user.email)
+        if (i === -1) db.users.push(user)
+        else db.users[i] = { ...db.users[i], ...user }
+      }
+      for (const studio of pack.studios) {
+        const i = db.studios.findIndex((row) => row.userId === studio.userId || row.id === studio.id)
+        if (i === -1) db.studios.push(studio)
+        else db.studios[i] = studio
+      }
+      for (const sub of pack.subs.map(mapSub)) {
+        const i = db.subs.findIndex((row) => row.userId === sub.userId)
+        if (i === -1) db.subs.push(sub)
+        else db.subs[i] = sub
+      }
+      for (const order of pack.orders.map(mapOrder)) {
+        const i = db.orders.findIndex((row) => row.id === order.id || row.razorpayOrderId === order.razorpayOrderId)
+        if (i === -1) db.orders.push(order)
+        else db.orders[i] = order
+      }
+      write(db)
+      return { users: pack.users.length, studios: pack.studios.length, orders: pack.orders.length }
     },
   }
   return store
@@ -910,6 +975,66 @@ function postgresStore(url: string): Store {
     async listHqNotices() {
       const rows = await sql`SELECT id, title, body, href, at, sticky FROM hq_inbox ORDER BY at DESC LIMIT 200`
       return (rows as AppNotice[]).map(mapHqNotice)
+    },
+    async ping() {
+      await sql`SELECT 1`
+    },
+    async exportDesk() {
+      const users = await sql`SELECT id, email, password_hash AS "passwordHash", created_at AS "createdAt", email_verified_at AS "emailVerifiedAt", role, deleted_at AS "deletedAt", google_id AS "googleId" FROM users`
+      const studios = await sql`SELECT id, user_id AS "userId", name, owner, city, phone, tagline, onboarded, leads, quotations FROM studios`
+      const subs = await sql`SELECT user_id AS "userId", plan, status, trial_ends_on::text AS "trialEndsOn", period_ends_on::text AS "periodEndsOn", razorpay_payment_id AS "razorpayPaymentId", requested_plan AS "requestedPlan" FROM subscriptions`
+      const orders = await sql`SELECT id, user_id AS "userId", razorpay_order_id AS "razorpayOrderId", plan, amount, status, created_at AS "createdAt", paid_at AS "paidAt", razorpay_payment_id AS "razorpayPaymentId" FROM billing_orders`
+      return packDesk(users as UserRow[], studios as StudioRow[], subs as SubRow[], orders as OrderRow[])
+    },
+    async importDesk(pack) {
+      for (const user of pack.users.map(mapUser)) {
+        await sql`INSERT INTO users (id, email, password_hash, created_at, email_verified_at, role, deleted_at, google_id)
+          VALUES (${user.id}, ${user.email}, ${user.passwordHash}, ${user.createdAt}, ${user.emailVerifiedAt}, ${user.role}, ${user.deletedAt}, ${user.googleId})
+          ON CONFLICT (id) DO UPDATE SET
+            email = excluded.email,
+            password_hash = excluded.password_hash,
+            email_verified_at = excluded.email_verified_at,
+            role = excluded.role,
+            deleted_at = excluded.deleted_at,
+            google_id = excluded.google_id`
+      }
+      for (const studio of pack.studios) {
+        await sql`INSERT INTO studios (id, user_id, name, owner, city, phone, tagline, onboarded, leads, quotations)
+          VALUES (${studio.id}, ${studio.userId}, ${studio.name}, ${studio.owner}, ${studio.city}, ${studio.phone}, ${studio.tagline}, ${Boolean(studio.onboarded)}, ${JSON.stringify(studio.leads || [])}::jsonb, ${JSON.stringify(studio.quotations || [])}::jsonb)
+          ON CONFLICT (user_id) DO UPDATE SET
+            name = excluded.name,
+            owner = excluded.owner,
+            city = excluded.city,
+            phone = excluded.phone,
+            tagline = excluded.tagline,
+            onboarded = excluded.onboarded,
+            leads = excluded.leads,
+            quotations = excluded.quotations`
+      }
+      for (const sub of pack.subs.map(mapSub)) {
+        await sql`INSERT INTO subscriptions (user_id, plan, status, trial_ends_on, period_ends_on, razorpay_payment_id, requested_plan)
+          VALUES (${sub.userId}, ${sub.plan}, ${sub.status}, ${sub.trialEndsOn}, ${sub.periodEndsOn}, ${sub.razorpayPaymentId}, ${sub.requestedPlan || null})
+          ON CONFLICT (user_id) DO UPDATE SET
+            plan = excluded.plan,
+            status = excluded.status,
+            trial_ends_on = excluded.trial_ends_on,
+            period_ends_on = excluded.period_ends_on,
+            razorpay_payment_id = excluded.razorpay_payment_id,
+            requested_plan = excluded.requested_plan`
+      }
+      for (const order of pack.orders.map(mapOrder)) {
+        await sql`INSERT INTO billing_orders (id, user_id, razorpay_order_id, plan, amount, status, created_at, paid_at, razorpay_payment_id)
+          VALUES (${order.id}, ${order.userId}, ${order.razorpayOrderId}, ${order.plan}, ${order.amount}, ${order.status}, ${order.createdAt}, ${order.paidAt}, ${order.razorpayPaymentId})
+          ON CONFLICT (id) DO UPDATE SET
+            user_id = excluded.user_id,
+            razorpay_order_id = excluded.razorpay_order_id,
+            plan = excluded.plan,
+            amount = excluded.amount,
+            status = excluded.status,
+            paid_at = excluded.paid_at,
+            razorpay_payment_id = excluded.razorpay_payment_id`
+      }
+      return { users: pack.users.length, studios: pack.studios.length, orders: pack.orders.length }
     },
   }
   return store

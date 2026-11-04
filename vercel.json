@@ -17,6 +17,9 @@
       ]
     }
   ],
+  "crons": [
+    { "path": "/api/admin/nightly", "schedule": "0 1 * * *" }
+  ],
   "rewrites": [
     { "source": "/api/api/:path*", "destination": "/api/:path*" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }

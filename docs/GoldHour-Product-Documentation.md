@@ -183,7 +183,10 @@ Hobby plan: keep function count low (nested `api/auth`, `api/billing`, `api/admi
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| GET | `/api/health` | Liveness |
+| GET | `/api/health` | Liveness + Postgres ping (`db: "ok"` or HTTP 503) |
+| GET | `/api/admin/nightly` | Cron / HQ: dump every studio and mail a restore file to HQ |
+| GET | `/api/admin/restore-pack` | HQ download of the restore file (includes password hashes) |
+| POST | `/api/admin/restore-pack` | HQ restore from that file |
 | POST | `/api/auth/otp-send` | SMS OTP to Indian 10-digit number |
 | POST | `/api/auth/otp-verify` | Check 6-digit code (10 min, 5 tries, 8s resend gap) |
 | POST | `/api/auth/register` | Create studio (OTP required except HQ) |

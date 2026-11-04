@@ -16,6 +16,8 @@ export async function sendSmtpMail(opts: {
   subject: string
   text: string
   html?: string
+  filename?: string
+  fileBody?: string
 }): Promise<boolean> {
   const pass = process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD || ''
   const user = process.env.SMTP_USER || process.env.GMAIL_USER || ADMIN_EMAIL
@@ -23,28 +25,47 @@ export async function sendSmtpMail(opts: {
   const port = Number(process.env.SMTP_PORT || 465)
   if (!pass || !host || !user) return false
 
-  const boundary = `gh${Date.now().toString(36)}`
-  const body = opts.html
+  const mixed = `ghx${Date.now().toString(36)}`
+  const alt = `gha${Date.now().toString(36)}`
+  const letter = opts.html
     ? [
-        `--${boundary}`,
+        `--${alt}`,
         'Content-Type: text/plain; charset=UTF-8',
         '',
         opts.text,
-        `--${boundary}`,
+        `--${alt}`,
         'Content-Type: text/html; charset=UTF-8',
         '',
         opts.html,
-        `--${boundary}--`,
+        `--${alt}--`,
       ].join('\r\n')
     : opts.text
+  const body =
+    opts.filename && opts.fileBody
+      ? [
+          `--${mixed}`,
+          opts.html ? `Content-Type: multipart/alternative; boundary="${alt}"` : 'Content-Type: text/plain; charset=UTF-8',
+          '',
+          letter,
+          `--${mixed}`,
+          'Content-Type: application/json; charset=UTF-8',
+          'Content-Transfer-Encoding: base64',
+          `Content-Disposition: attachment; filename="${opts.filename}"`,
+          '',
+          Buffer.from(opts.fileBody, 'utf8').toString('base64'),
+          `--${mixed}--`,
+        ].join('\r\n')
+      : letter
   const payload = [
     `From: GoldHour <${user}>`,
     `To: ${opts.to}`,
     `Subject: ${subjectHeader(opts.subject)}`,
     'MIME-Version: 1.0',
-    opts.html
-      ? `Content-Type: multipart/alternative; boundary="${boundary}"`
-      : 'Content-Type: text/plain; charset=UTF-8',
+    opts.filename && opts.fileBody
+      ? `Content-Type: multipart/mixed; boundary="${mixed}"`
+      : opts.html
+        ? `Content-Type: multipart/alternative; boundary="${alt}"`
+        : 'Content-Type: text/plain; charset=UTF-8',
     '',
     body,
   ].join('\r\n')

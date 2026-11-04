@@ -1,4 +1,5 @@
-import { ADMIN_EMAIL, APP_URL } from './constants.ts'
+import { ADMIN_EMAIL, APP_URL, DEMO_EMAIL } from './constants.ts'
+import type { DeskBackup } from './db.ts'
 import { sendSmtpMail } from './smtp.ts'
 
 const WEB3FORMS_KEY = process.env.WEB3FORMS_ACCESS_KEY || 'e7e8e974-642c-411f-83ae-999cdbcdbb6e'
@@ -26,12 +27,27 @@ async function viaSmtp(to: string, subject: string, text: string, html?: string)
   return sendSmtpMail({ to, subject, text, html })
 }
 
-async function viaResend(to: string, subject: string, text: string, html?: string) {
+async function viaResend(
+  to: string,
+  subject: string,
+  text: string,
+  html?: string,
+  file?: { filename: string; content: string },
+) {
   if (!RESEND_KEY) return false
   const { ok, body } = await postJson('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${RESEND_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: FROM, to, subject, text, html }),
+    body: JSON.stringify({
+      from: FROM,
+      to,
+      subject,
+      text,
+      html,
+      attachments: file
+        ? [{ filename: file.filename, content: Buffer.from(file.content, 'utf8').toString('base64') }]
+        : undefined,
+    }),
   })
   if (!ok) console.error('goldhour-mail-resend', body.slice(0, 240))
   return ok
@@ -157,6 +173,27 @@ export async function mailUser(to: string, subject: string, text: string) {
 }
 
 /** One recipient only — used for OTP so the code is not copied to HQ. */
+export async function mailDeskBackup(pack: DeskBackup) {
+  const day = pack.exportedAt.slice(0, 10)
+  const studios = pack.users.filter((user) => user.email !== ADMIN_EMAIL && user.email !== DEMO_EMAIL).length
+  const filename = `goldhour-restore-${day}.json`
+  const fileBody = JSON.stringify(pack)
+  const subject = `GoldHour daily desk backup · ${day} · ${studios} studio${studios === 1 ? '' : 's'}`
+  const text = [
+    `Keep this mail. It is the off-site copy of every GoldHour studio.`,
+    `Studios: ${studios}. Users: ${pack.users.length}. Orders: ${pack.orders.length}.`,
+    `If Neon dies again: HQ → Records → Restore from backup, and upload ${filename}.`,
+    `Do not forward this file. It can sign studios back in.`,
+  ].join('\n')
+  const file = { filename, content: fileBody }
+  if (await withBudget(sendSmtpMail({ to: ADMIN_EMAIL, subject, text, filename, fileBody }), 12000)) return true
+  if (await withBudget(viaResend(ADMIN_EMAIL, subject, text, undefined, file), 12000)) return true
+  return mailAdmin(
+    subject,
+    `${text}\n\nThe restore file could not be attached. Download it from HQ → Records while the desk is up.`,
+  )
+}
+
 export async function mailDirect(to: string, subject: string, text: string) {
   const letter = `${text}\n\n— GoldHour · ${APP_URL}`
   if (await withBudget(viaSmtp(to, subject, letter))) return true

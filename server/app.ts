@@ -26,7 +26,8 @@ import {
   verifyPassword,
   webhookSignature,
 } from './crypto.ts'
-import { emptyStudio, getStore, type AuditRow, type UserRow } from './db.ts'
+import { alertDatabaseDown, runNightlyBackup } from './backup.ts'
+import { emptyStudio, getStore, isDeskBackup, type AuditRow, type UserRow } from './db.ts'
 import { googleAuthUrl, googleConfigured, googleProfileFromCode, type GoogleProfile } from './google.ts'
 import { mailUser } from './mail.ts'
 import { syncHqInbox } from './noticeMail.ts'
@@ -64,6 +65,18 @@ function clientIp(c: Context) {
 
 function userAgent(c: Context) {
   return (c.req.header('user-agent') || '').slice(0, 180)
+}
+
+function isCronRequest(c: Context) {
+  if (c.req.header('x-vercel-cron') === '1') return true
+  const secret = (process.env.CRON_SECRET || '').trim()
+  const auth = c.req.header('authorization') || ''
+  return Boolean(secret) && auth === `Bearer ${secret}`
+}
+
+function isDatabaseError(err: unknown) {
+  const text = err instanceof Error ? `${err.name} ${err.message}` : String(err)
+  return /NeonDbError|password authentication failed|DATABASE_URL|ECONNREFUSED|ENOTFOUND|getaddrinfo/i.test(text)
 }
 
 const app = new Hono().basePath('/api')
@@ -385,8 +398,6 @@ async function finishGoogleSignIn(c: Context, origin: string, profile: GooglePro
   return c.redirect(`${origin}${studioReadyPath(data)}`)
 }
 
-app.get('/health', (c) => c.json({ ok: true }))
-
 let ready = false
 
 app.use('*', async (c, next) => {
@@ -404,7 +415,43 @@ app.onError((err, c) => {
   if (err instanceof Error && err.message === 'CONFIG') {
     return c.json({ error: 'The desk is not configured yet.', errorId: id }, 500)
   }
+  if (isDatabaseError(err)) {
+    return c.json(
+      { error: 'The studio desk cannot reach its database. HQ has been alerted.', errorId: id },
+      503,
+    )
+  }
   return c.json({ error: 'Something went wrong. Try again.', errorId: id }, 500)
+})
+
+app.get('/health', async (c) => {
+  try {
+    await getStore().ping()
+    return c.json({ ok: true, db: 'ok' })
+  } catch (err) {
+    console.error('goldhour-health-db', err)
+    return c.json({ ok: false, db: 'down' }, 503)
+  }
+})
+
+app.get('/admin/nightly', async (c) => {
+  const cron = isCronRequest(c)
+  if (!cron) {
+    const actor = await actorFrom(c)
+    if (!actor) return c.json({ error: 'Sign in required' }, 401)
+    if (!isAdminEmail(actor.user.email) && actor.user.role !== 'hq') {
+      return c.json({ error: "You don't have permission to perform this action." }, 403)
+    }
+  }
+  try {
+    const result = await runNightlyBackup()
+    await audit({ action: 'backup.nightly', detail: `${result.studios} studios`, ip: clientIp(c) })
+    return c.json(result)
+  } catch (err) {
+    console.error('goldhour-nightly', err)
+    await alertDatabaseDown(err instanceof Error ? err.message : 'unknown')
+    return c.json({ ok: false, error: 'Backup failed. HQ was mailed.' }, 503)
+  }
 })
 
 app.post('/auth/otp-send', async (c) => {
@@ -1386,6 +1433,37 @@ app.get('/admin/export', async (c) => {
       studioId: row.studioId,
     })),
   })
+})
+
+app.get('/admin/restore-pack', async (c) => {
+  const actor = await actorFrom(c)
+  if (!actor) return c.json({ error: 'Sign in required' }, 401)
+  if (!isAdminEmail(actor.user.email) && actor.user.role !== 'hq') {
+    return c.json({ error: "You don't have permission to perform this action." }, 403)
+  }
+  const pack = await getStore().exportDesk()
+  await audit({ action: 'backup.download', userId: actor.user.id, ip: clientIp(c), detail: `${pack.users.length} users` })
+  return c.json(pack)
+})
+
+app.post('/admin/restore-pack', async (c) => {
+  const actor = await actorFrom(c)
+  if (!actor) return c.json({ error: 'Sign in required' }, 401)
+  if (!isAdminEmail(actor.user.email) && actor.user.role !== 'hq') {
+    return c.json({ error: "You don't have permission to perform this action." }, 403)
+  }
+  const body = await readJson<unknown>(c)
+  if (!isDeskBackup(body)) {
+    return c.json({ error: 'That file is not a GoldHour restore pack.' }, 400)
+  }
+  const result = await getStore().importDesk(body)
+  await audit({
+    action: 'backup.restore',
+    userId: actor.user.id,
+    ip: clientIp(c),
+    detail: `${result.users} users / ${result.studios} studios`,
+  })
+  return c.json({ ok: true, ...result })
 })
 
 export default app

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Download, LogOut, Shield } from 'lucide-react'
+import { Download, LogOut, Shield, Upload } from 'lucide-react'
 import { BrandMark } from '../components/BrandMark.tsx'
 import { NoticeBell } from '../components/NoticeBell.tsx'
 import { DeskSession } from '../components/TabGuard.tsx'
@@ -348,6 +348,9 @@ export function Admin() {
   const [pack, setPack] = useState<HqExport | null>(null)
   const [packError, setPackError] = useState('')
   const [packBusy, setPackBusy] = useState(false)
+  const [backupBusy, setBackupBusy] = useState(false)
+  const [backupHint, setBackupHint] = useState('')
+  const confirm = useConfirm()
 
   function loadHq() {
     api<AdminOverview>('/api/admin/overview')
@@ -365,6 +368,76 @@ export function Admin() {
       setPackError(err instanceof Error ? err.message : 'Could not load records')
     } finally {
       setPackBusy(false)
+    }
+  }
+
+  async function downloadRestorePack() {
+    setBackupBusy(true)
+    setBackupHint('')
+    try {
+      const pack = await api<{ exportedAt: string }>('/api/admin/restore-pack')
+      downloadText(`goldhour-restore-${pack.exportedAt.slice(0, 10)}.json`, JSON.stringify(pack, null, 2), 'application/json')
+      setBackupHint('Restore file downloaded. Keep it off this laptop too — Gmail already gets a copy every night.')
+    } catch (err) {
+      setBackupHint(err instanceof Error ? err.message : 'Could not build restore file')
+    } finally {
+      setBackupBusy(false)
+    }
+  }
+
+  async function mailBackupNow() {
+    const ok = await confirm({
+      title: 'Mail tonight’s restore file to HQ now?',
+      body: 'A JSON copy of every studio goes to ajithkutten1998@gmail.com. Keep that mail. Do not forward it.',
+      confirmLabel: 'Send backup',
+      cancelLabel: 'Not now',
+    })
+    if (!ok) return
+    setBackupBusy(true)
+    setBackupHint('')
+    try {
+      const result = await api<{ studios: number; mailed: boolean }>('/api/admin/nightly')
+      setBackupHint(
+        result.mailed
+          ? `Backup mailed. ${result.studios} studio${result.studios === 1 ? '' : 's'} on file.`
+          : `Backup built for ${result.studios} studio${result.studios === 1 ? '' : 's'}, but mail did not send. Download the restore file.`,
+      )
+    } catch (err) {
+      setBackupHint(err instanceof Error ? err.message : 'Backup failed')
+    } finally {
+      setBackupBusy(false)
+    }
+  }
+
+  async function restoreFromFile(file: File) {
+    let raw: unknown
+    try {
+      raw = JSON.parse(await file.text())
+    } catch {
+      setBackupHint('That file is not JSON.')
+      return
+    }
+    const ok = await confirm({
+      title: 'Restore every studio from this file?',
+      body: 'Matching studios are overwritten. Empty database is filled. Paying desks come back only if they are in this file.',
+      confirmLabel: 'Restore desks',
+      cancelLabel: 'Leave them',
+      danger: true,
+    })
+    if (!ok) return
+    setBackupBusy(true)
+    setBackupHint('')
+    try {
+      const result = await api<{ users: number; studios: number; orders: number }>('/api/admin/restore-pack', {
+        method: 'POST',
+        body: JSON.stringify(raw),
+      })
+      setBackupHint(`Restored ${result.studios} studios, ${result.users} users, ${result.orders} orders.`)
+      loadHq()
+    } catch (err) {
+      setBackupHint(err instanceof Error ? err.message : 'Restore failed')
+    } finally {
+      setBackupBusy(false)
     }
   }
 
@@ -596,7 +669,7 @@ export function Admin() {
                 <p className="text-[11px] uppercase tracking-[0.18em] text-gold-soft">HQ records</p>
                 <h2 className="mt-1 font-display text-2xl">Database snapshot</h2>
                 <p className="mt-1 text-sm text-mute">
-                  Live desks, leads, quotations, Razorpay orders, and activity. Passwords and OTP hashes are not included.
+                  CSV/JSON below is a human snapshot (no passwords). The restore file and the nightly HQ mail can put desks back if Neon dies.
                 </p>
               </div>
               <button
@@ -672,6 +745,45 @@ export function Admin() {
             ) : (
               <p className="text-mute">{packBusy ? 'Loading records…' : 'Open Records to load the database snapshot.'}</p>
             )}
+            <div className="rounded-2xl border border-gold/35 bg-ink p-4">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-gold-soft">Off-site restore</p>
+              <p className="mt-2 text-sm text-mute">
+                Every night at 06:30 IST a restore file is mailed to HQ Gmail. Keep those mails. If the database disappears again, upload the latest file here.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="gh-btn inline-flex items-center gap-2 rounded-full bg-gold px-3 py-1.5 text-xs text-ink disabled:opacity-50"
+                  disabled={backupBusy}
+                  onClick={() => void downloadRestorePack()}
+                >
+                  <Download size={12} /> Restore file
+                </button>
+                <button
+                  type="button"
+                  className="gh-btn inline-flex items-center gap-2 rounded-full border border-gold/35 px-3 py-1.5 text-xs text-gold-soft disabled:opacity-50"
+                  disabled={backupBusy}
+                  onClick={() => void mailBackupNow()}
+                >
+                  Mail HQ now
+                </button>
+                <label className="gh-btn inline-flex cursor-pointer items-center gap-2 rounded-full border border-gold/35 px-3 py-1.5 text-xs text-gold-soft">
+                  <Upload size={12} /> Restore from file
+                  <input
+                    type="file"
+                    accept="application/json,.json"
+                    className="sr-only"
+                    disabled={backupBusy}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      e.target.value = ''
+                      if (file) void restoreFromFile(file)
+                    }}
+                  />
+                </label>
+              </div>
+              {backupHint ? <p className="mt-2 text-sm text-gold-soft">{backupHint}</p> : null}
+            </div>
           </section>
         ) : null}
 

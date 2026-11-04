@@ -14,12 +14,14 @@ Studio data is isolated by the signed-in user. There is no `/api/leads/:id` — 
 - Input validation + size cap on desk saves
 - HQ-only `/api/admin/*` (403 otherwise)
 - Generic 500s with an error id (`GH-…`)
+- `/api/health` pings Postgres (503 if the database is down)
+- Daily restore mail to HQ plus HQ → Records → Restore from file
 - Audit log on this desk (`/studio/activity`) and HQ (`/api/admin/audit`)
 - Security headers: nosniff, frame deny, referrer, HSTS, permissions-policy
 - Forgot password + email confirm (needs `RESEND_API_KEY` to mail the photographer; otherwise HQ is copied)
 
 ## Not yet (later phases)
 
-MFA, team RBAC (editor/accountant), signed photo URLs, Argon2id, backups UI, Copilot.
+MFA, team RBAC (editor/accountant), signed photo URLs, Argon2id, Copilot.
 
 Set `RESEND_API_KEY` and `MAIL_FROM` on Vercel when you want reset/verify mail to hit the studio inbox directly.

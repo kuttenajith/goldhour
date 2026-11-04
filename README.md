@@ -37,6 +37,7 @@ UI: http://localhost:5173 · API: http://localhost:8788
 | --- | --- |
 | `DATABASE_URL` | Neon Postgres |
 | `JWT_SECRET` | Session cookies |
+| `CRON_SECRET` | Nightly HQ restore mail (`/api/admin/nightly`) |
 | `RAZORPAY_KEY_ID` | Checkout |
 | `RAZORPAY_KEY_SECRET` | Orders + signature |
 | `RAZORPAY_WEBHOOK_SECRET` | `https://goldhour-chi.vercel.app/api/billing/webhook` |
